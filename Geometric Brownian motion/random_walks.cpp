@@ -31,26 +31,6 @@ double gen_norm(double mean, double variance){
     return d(gen);
 }
 
-// arithmetic random walk with drift mu and Weiner variance parameter sigma
-std::vector<double> arw(double x, int T, double dt, double mu, double sigma){
-
-    int n = T/dt;
-    double z = 0;
-    double dx = 0;
-
-    std::vector<double> data;
-
-    for(int i=0; i<n; i++){
-        z = gen_norm(0,1);
-        dx = mu*dt+sigma*z*sqrt(dt);        
-        x += dx;
-
-        data.push_back(x);
-    }
-
-    return data;
-}
-
 // geometric random walk with drift mu and volatility sigma
 struct GRW{
 
