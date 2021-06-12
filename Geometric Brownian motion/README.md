@@ -1,1 +1,3 @@
-A series of projects of varying size, meant to document my study of Monte Carlo methods and their application to finance.
+Computing gemoetric brownian motion paths and distribution of endpoints.
+
+lognorm.png shows an example. 
