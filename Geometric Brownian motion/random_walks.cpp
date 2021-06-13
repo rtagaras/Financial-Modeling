@@ -44,7 +44,7 @@ struct GRW{
     GRW(double s_0_, double mu_, double sigma_, double T_max_, double dt_, int days_between_divs_ = 0, double RFR_ = 0.0, double yield_ = 0.0){
         s_0 = s_0_;
         mu = mu_;
-        sigma = sigma_;
+        sigma = sigma_; 
         T_max = T_max_;
         dt = dt_;
         n  = T_max/dt;

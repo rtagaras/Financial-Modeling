@@ -1,0 +1,17 @@
+#./Geometric_Brownian_motion/Data/
+#*.txt
+#**/Data
+#**/data
+
+# This ignores files without an extension (e.x. C++ binaries)
+# Ignore all
+*
+
+# Unignore all with extensions
+!*.*
+
+# Unignore all dirs
+!*/
+
+# Ignore all directories that store datafiles
+**/Data
