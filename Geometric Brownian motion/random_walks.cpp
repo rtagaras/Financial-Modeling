@@ -4,6 +4,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <tuple>
 
 //output a vector
 template <class T>
@@ -36,10 +37,8 @@ double gen_norm(double mean, double variance){
 // s_0 is initial stock price at day zero
 struct GRW{
 
-    double mu, sigma, T_max, dt, s_0, end_value, s, z, RFR, yield;
-    int n, days_between_divs;
-
-    std::vector<double> data;
+    double mu, sigma, T_max, dt, s_0, s, z, RFR, yield, div = 0.0;
+    int n, days_between_divs, days_since_div, steps_per_day = 0;
 
     GRW(double s_0_, double mu_, double sigma_, double T_max_, double dt_, int days_between_divs_ = 0, double RFR_ = 0.0, double yield_ = 0.0){
         s_0 = s_0_;
@@ -51,10 +50,13 @@ struct GRW{
         days_between_divs = days_between_divs_;
         RFR = RFR_;
         yield = yield_;
+        steps_per_day = 1/dt;
     }
 
     // calculate price as a function of time, measured in days
-    void path(){
+    std::vector<double> path(){
+        std::vector<double> data;
+
         s = s_0;
         
         for(int i=0; i<n; i++){
@@ -65,20 +67,25 @@ struct GRW{
             data.push_back(s);
         }
 
-        end_value = data.back();
+        return data;
     }
 
     // calculate price with dividends, assuming that dividends are reinvested at risk-free rate
-    void path_with_dividends(){
+    std::vector<double> path_with_dividends(){
+        std::vector<double> data;
 
         s = s_0;
-        double div = 0;
-        double days_since_div = 0;
+        div = 0;
+        days_since_div = 0;
 
         for(int i=0; i<n; i++){
             z = gen_norm(0.0, 1.0);
             s = s*(1.0 + mu*dt+sigma*z*sqrt(dt));
-            days_since_div++;
+            
+            // This should count the number of time steps in a single day and only increment days_since_div if a complete day has passed. 
+            if(i % steps_per_day == 0){
+                days_since_div++;
+            }
 
             if(days_since_div == days_between_divs){
                 
@@ -97,30 +104,51 @@ struct GRW{
         // After reaching the end of the calculation period, we need to make sure that the total dividend growth after the last dividend has been 
         // accounted for.
         div += div*RFR*days_since_div/days_between_divs;
-        end_value = s + div;
+        data.push_back(s+div);
 
-        //return data;
+        return data;
     }
 };
 
 int main(){
 
-    //Create 1000 instances of geometric brownian motion. Here, we consider the paths and also store the ending values.
     std::string filename = "";
     std::vector<double> end_values;
+    std::vector<double> p;
+    double end_val = 0.0;
+    int profit_count = 0;
 
-    for(int i=0; i<100000; i++){
-        GRW g = GRW(100.0, 0.0, 0.04, 60.0, 0.1);
-        //std::vector<double> p = g.path();
-        g.path();
+    // Parameters
+    int num_trials = 10000;
+    double starting_price = 100.0;
+    double mu = 0.1;
+    double sigma = 0.04;
+    double T_max = 365.0;
+    double dt = 0.1;
+    int days_between_divs = 91;
+    double RFR = 0.02;
+    double yield = 0.08;
+
+    // Create 100000 instances of geometric brownian motion with a dividend. 
+    // Here, we consider the paths and also store the ending values.
+    GRW g = GRW(starting_price, mu, sigma, T_max, dt, days_between_divs, RFR, yield);
+
+    for(int i=0; i<num_trials; i++){
+        p = g.path_with_dividends();
+        end_val = p.back();
+
+        if (end_val > 100){
+            profit_count++;
+        }
 
         filename = "data"+ std::to_string(i);
-        output(g.data, filename);
+        output(p, filename);
 
-        end_values.push_back(g.end_value);
+        end_values.push_back(end_val);
     }
 
     output(end_values, "end_values");
+    std::cout << "Probability of profit: " << (double) profit_count/num_trials << std::endl;
  
     return 0;
 }
