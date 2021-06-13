@@ -4,7 +4,6 @@
 #include <string>
 #include <vector>
 #include <sstream>
-#include <tuple>
 
 //output a vector
 template <class T>
