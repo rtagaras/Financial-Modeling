@@ -3,25 +3,18 @@
 #include <fstream>
 #include <string>
 #include <vector>
-#include <sstream>
 
 //output a vector
-template <class T>
+template<class T>
 void output(std::vector<T> v, std::string filename){
-	std::stringstream ss;
-	std::string s;
-		
-	std::string name = "./Data/" + filename + ".txt";
-	std::ofstream ofs(name);
-	for(auto p =v.begin(); p!=v.end(); ++p){
-        ss << *p;
-        ss >> s;
-        ofs << s;
-        ss.clear();
-			
-		ofs << std::endl;
-	}
-	ofs.close();
+    std::ofstream ofs;
+    ofs.open(filename + ".txt");
+    
+    for(int i=0; i<v.size(); i++){
+        ofs << v[i] << '\n';
+    }
+    
+    ofs.close();
 }
 
 std::random_device rd;

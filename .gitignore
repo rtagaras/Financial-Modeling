@@ -10,3 +10,5 @@
 
 # Ignore all directories that store datafiles
 **/Data
+
+test.cpp
