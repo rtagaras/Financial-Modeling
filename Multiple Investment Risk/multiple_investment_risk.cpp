@@ -138,7 +138,7 @@ Eigen::VectorXd correlated_samples(Eigen::MatrixXd L){
 struct market_scenario{
 
     double mu = 0.0, sigma = 0.0, T_max = 0.0, dt = 0.0, steps_per_day = 0.0;
-    std::vector<double> fixed_times, fixed_prices, adjusted_prices;
+    std::vector<double> fixed_times, fixed_prices, adjusted_prices, market_prices;
 
     // fluctuations around the fixed prices
     GRW g;
@@ -186,6 +186,33 @@ struct market_scenario{
 
         return std::nullopt;
     }
+
+    // returns a vector that contains the prices for the market, subject to the constraints given in the market_scenario constructor
+    std::vector<double> scenario(){
+        std::vector<double> mp;
+
+        for(int i=0; i< T_max/dt; i++){
+            mp.push_back(p[i] + piecewise_linear_interpolation(i*dt));
+        }
+
+        market_prices = mp;
+        return mp;
+    }
+
+    // given a scenario, return the price increments 
+    std::vector<double> price_increments(){
+
+        std::vector<double> m = scenario();
+        std::vector<double> PI;
+
+        for(int i=1; i<m.size(); i++){
+            PI.push_back((m[i]-m[i-1])/(m[i-1]*sigma*sqrt(dt)));
+        }
+
+        return PI;
+    }
+
+    
 };
 
 // A vector-valued geometric random walk where components have correlated price increments. 
@@ -239,18 +266,6 @@ struct correlated_GRW{
 };
  
 int main(){
-
-//     Eigen::MatrixXd mat = Eigen::MatrixXd::Zero(3,3);
-//     mat(0,1) = 0.5;
-//     mat(0,2) = 0.5;
-//     mat(1,2) = 0.5;
-
-//     Eigen::VectorXd devs(3);
-//     devs << 4.0,5.0,6.0;
-
-//     Eigen::MatrixXd M = Correlation_Matrix(devs, mat).C;
-
-//     std::cout << "new: " << M << std::endl;
 
     return 0;
 }
