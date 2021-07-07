@@ -144,7 +144,7 @@ struct market_scenario{
     GRW g;
     std::vector<double> p;
 
-    market_scenario(double mu_, double sigma_, double T_max_, double dt_, std::vector<double> fixed_times_, std::vector<double> fixed_prices_) : g(fixed_prices[0], mu, sigma, T_max, dt){
+    market_scenario(double mu_, double sigma_, double T_max_, double dt_, std::vector<double> fixed_times_, std::vector<double> fixed_prices_) : g(fixed_prices_[0], mu_, sigma_, T_max_, dt_){
         mu = mu_;
         sigma = sigma_;
         T_max = T_max_;
@@ -192,7 +192,7 @@ struct market_scenario{
         std::vector<double> mp;
 
         for(int i=0; i< T_max/dt; i++){
-            mp.push_back(p[i] + piecewise_linear_interpolation(i*dt));
+            mp.push_back(p[i] + piecewise_linear_interpolation(i*dt).value());
         }
 
         market_prices = mp;
@@ -266,6 +266,13 @@ struct correlated_GRW{
 };
  
 int main(){
+
+    std::vector<double> fixed_times = {0,91,182,273,364};
+    std::vector<double> fixed_prices = {100,110,90,100,120};
+    market_scenario m(0.0, 0.4, 365, 1, fixed_times, fixed_prices);
+    std::vector<double> s = m.scenario();
+
+    output(s, "data");
 
     return 0;
 }
