@@ -2,20 +2,30 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 # configuring various figure elements
-fig, ax1 = plt.subplots()
-fig.suptitle("Geometric Brownian Motion")
+#fig, (ax1, ax2, ax3) = plt.subplots(1,3)
+#fig.suptitle("Market Scenario Data")
 
-ax1.set_title("1000 GBM Paths")
-ax1.set(xlabel = "Days", ylabel = "Value")
+fig, ax3 = plt.subplots()
 
-# Adjusting units of x-axis ticks
-x1_min = 0
-x1_max = 365
-x1_steps = 3651
-x1_ticks = [i/(x1_steps/x1_max) for i in range(x1_steps)]
+# ax1.set_title("Interpolation")
+# ax1.set(xlabel = "Days", ylabel = "Value")
+
+# ax2.set_title("GRW")
+# ax2.set(xlabel = "Days", ylabel = "Value")
+
+ax3.set_title("Sum")
+ax3.set(xlabel = "Days", ylabel = "Value")
 
 
-data = np.loadtxt("data.txt")
-ax1.plot(data)
+# interpolation = np.loadtxt("./Data/interpolation.txt")
+# GRW = np.loadtxt("./Data/GRW.txt")
+for i in range(10):
+    filename = "./Data/sum" + str(i) + ".txt"
+    data = np.loadtxt(filename)
+    ax3.plot(data)
+
+# ax1.plot(interpolation)
+# ax2.plot(GRW)
+#ax3.plot(s)
 
 plt.show()

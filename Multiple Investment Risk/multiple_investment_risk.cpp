@@ -8,11 +8,11 @@
  
 using Eigen::MatrixXd;
 
-//output a vector
+//write a vector to a .txt file and store it in the Data subdirectory
 template<class T>
 void output(std::vector<T> v, std::string filename){
     std::ofstream ofs;
-    ofs.open(filename + ".txt");
+    ofs.open("./Data/" + filename + ".txt");
     
     for(int i=0; i<v.size(); i++){
         ofs << v[i] << '\n';
@@ -168,16 +168,14 @@ struct market_scenario{
 
         double a = fixed_times[0];
         double A = adjusted_prices[0];
-        double b = 0.0, B = 0.0, y = 0.0;
+        double b = 0.0, B = 0.0;
 
-        for(int i=0; i<fixed_times.size(); i++){
+        for(int i=1; i<fixed_times.size(); i++){
             b = fixed_times[i];
             B = adjusted_prices[i];
 
             if(a <= t && t <= b){
-                y = (B*(t-a)-A*(t-b))/(b-a);
-
-                return y;
+                return (B*(t-a)-A*(t-b))/(b-a);
             }
 
             a = b;
@@ -211,8 +209,6 @@ struct market_scenario{
 
         return PI;
     }
-
-    
 };
 
 // A vector-valued geometric random walk where components have correlated price increments. 
@@ -266,13 +262,6 @@ struct correlated_GRW{
 };
  
 int main(){
-
-    std::vector<double> fixed_times = {0,91,182,273,364};
-    std::vector<double> fixed_prices = {100,110,90,100,120};
-    market_scenario m(0.0, 0.4, 365, 1, fixed_times, fixed_prices);
-    std::vector<double> s = m.scenario();
-
-    output(s, "data");
 
     return 0;
 }
