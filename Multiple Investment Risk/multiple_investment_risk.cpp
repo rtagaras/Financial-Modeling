@@ -303,7 +303,7 @@ int main(){
     std::vector<double> fixed_times = {0, 91, 182, 273, 364};
     std::vector<double> fixed_prices = {100, 90, 110, 120, 100};
     market_scenario m = market_scenario(0.0, 0.04, 365, 1, fixed_times, fixed_prices);
-    market_GRW mg = market_GRW(100, 0.8, 0.0, 0.05, 365, 1, m);
+    market_GRW mg = market_GRW(100, -0.8, 0.0, 0.05, 365, 1, m);
 
     output(mg.path(), "data");
     output(mg.market_prices, "market");
