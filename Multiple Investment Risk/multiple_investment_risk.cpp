@@ -212,7 +212,6 @@ struct market_scenario{
 };
 
 // A vector-valued geometric random walk where components have correlated price increments. 
-// Component GRWs can also be correlated with a given market_scenario.
 //
 // mu is a vector that holds the drift parameter for each component. Similarly, sigma is the volatility vector. 
 // T_max gives the number of days for which to calculate the path.
@@ -260,8 +259,54 @@ struct correlated_GRW{
         return data;
     }
 };
+
+// price of a stock correlated with a given market scenario
+//
+// s gives initial stock price, mu_s gives stock drift, sigma_s gives stock variance
+struct market_GRW{
+
+    double s = 0.0, mu = 0.0, rho = 0.0, sigma = 0.0, T_max = 0.0, dt = 0.0, n = 0.0;
+    std::vector<double> increments, market_prices;
+
+    market_GRW(double s_, double rho_, double mu_, double sigma_, double T_max_, double dt_, market_scenario m){
+        
+        s = s_;
+        mu = mu_;
+        rho = rho_;
+        sigma = sigma_;
+        T_max = T_max_;
+        dt = dt_;
+
+        n  = T_max/dt;
+        increments = m.price_increments();
+        market_prices = m.scenario();
+    }
+
+    std::vector<double> path(){
+
+        std::vector<double> stock_path;
+        double y = 0.0;
+
+        for(int i=0; i<n; i++){
+
+            y = rho*increments[i] + gen_norm(0,1)*sqrt(1.0-rho*rho);
+            s = s*(1.0 + mu*dt + sigma*y*sqrt(dt));
+            stock_path.push_back(s);
+        }
+
+        return stock_path;
+    }
+};
  
 int main(){
+
+    std::vector<double> fixed_times = {0, 91, 182, 273, 364};
+    std::vector<double> fixed_prices = {100, 90, 110, 120, 100};
+    market_scenario m = market_scenario(0.0, 0.04, 365, 1, fixed_times, fixed_prices);
+    market_GRW mg = market_GRW(100, 0.8, 0.0, 0.05, 365, 1, m);
+
+    output(mg.path(), "data");
+    output(mg.market_prices, "market");
 
     return 0;
 }
