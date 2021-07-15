@@ -336,9 +336,7 @@ struct market_GRW{
     }
 };
 
-// add a market scenario. this should be the first element of the path vector
-// we also want to add a risk function where we repeatedly create a bunch of GRW paths correlated with the same market scenario and calculate how 
-// often final values are in a particular range.
+
 struct market_correlated_GRW{
     // final correlation matrix 
     Eigen::MatrixXd Corr;
@@ -353,7 +351,10 @@ struct market_correlated_GRW{
     std::vector<double> market_path;
     std::vector<Eigen::VectorXd> samples;
 
-    market_correlated_GRW(Eigen::VectorXd s_0_, Eigen::VectorXd mu_, Eigen::VectorXd sigma_, Eigen::MatrixXd correlations_, double T_max_, double dt_, market_scenario m){
+    // proportions of the portfolio made up by individual securities. Total of values should sum to 1. 
+    Eigen::VectorXd weights;
+
+    market_correlated_GRW(Eigen::VectorXd s_0_, Eigen::VectorXd mu_, Eigen::VectorXd sigma_, Eigen::MatrixXd correlations_, double T_max_, double dt_, market_scenario m, Eigen::VectorXd weights_){
         s_0 = s_0_;
         mu = mu_;
         sigma = sigma_;
@@ -368,6 +369,19 @@ struct market_correlated_GRW{
 
         market_path = m.p;
         samples = market_correlated_samples(l, m);
+        weights = weights_;
+
+        // check to make sure that the fractions of the overall portfolio made up by each security add to 1.
+        double sum = 0;
+        for(int i=0; i<weights.size(); i++){
+            sum += weights(i);
+        }
+
+        // this may cause some issues with floating point precision, but as long as we don't have a portfolio where particular securities make up very
+        // very small percentages of the overall portfolio, we should be okay. 
+        if(sum != 1.0){
+            std::cout << "Portfolio weights do not add to 1." << std::endl;
+        }
     }
 
     // calculate prices as a function of time, measured in days
@@ -401,13 +415,31 @@ struct market_correlated_GRW{
         return data;
     }
 
-    // // returns the likelihood that the portfolio value ends in a given range
-    // double risk(int num_trials, double min_val, double max_val){
+    // returns the likelihood that the portfolio value ends in a given range
+    double risk(int num_trials, double min_val, double max_val){
 
-    //     for(int i=0; i<num_trials; i++){
+        double counter = 0.0;
+        double portfolio_value = 0.0;
+        Eigen::VectorXd path_end_values;
+        Eigen::VectorXd p = path().back();
 
-    //     }
-    // }
+        for(int i=0; i<num_trials; i++){
+
+            // copy path end values (except market scenario value) into new vector of just the security values
+            for(int j=1; j<p.size(); j++){
+                path_end_values(j-i) = p(j);
+            }            
+
+            portfolio_value = weights.dot(path_end_values);    
+
+            if(portfolio_value <= max_val && portfolio_value >= min_val){
+                counter++;
+            }
+            
+        }
+
+        return counter/num_trials;
+    }
 };
  
 int main(){
