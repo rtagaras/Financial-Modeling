@@ -231,7 +231,9 @@ struct market_scenario{
     }
 };
 
-std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, market_scenario m){
+//std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, market_scenario m){
+std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, std::vector<double> increments){
+
     /*
     Creates an array of vector-valued samples that can be used to generate GRWs that are correlated with a given market scenario.
     Individual vector components correspond to the different securities that we consider. There is one vector in the array for each time step.
@@ -240,8 +242,8 @@ std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, market
     Here, we take the market scenario to be the zeroth component of any vectors, so when defining the correlation matrix for the system, we must put the 
     correlations with the market scenario in the first row. 
     */
-    
-    std::vector<double> increments = m.price_increments();
+
+    //std::vector<double> increments = m.price_increments();
     std::vector<Eigen::VectorXd> Y;
 
     // Obtain the Cholesky decomposition of M, and along the way, check to make sure that we have a valid correlation matrix
@@ -250,7 +252,6 @@ std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, market
     if(lltOfA.info() == Eigen::NumericalIssue){
         std::cout << "Correlation matrix is likely not positive semidefinite." << std::endl;
     }   
-
 
     for(int i=0; i<increments.size(); i++){
 
@@ -391,22 +392,16 @@ struct market_correlated_GRW{
     weights contains the relative proportions of each security in the portfolio. 
     */
 
-    // final correlation matrix 
-    //Eigen::MatrixXd Corr;
-
-    // L matrix given by Choelsky decomposition
-    //Eigen::MatrixXd l;
-
     Eigen::VectorXd s_0, s, mu, sigma, z;
     double T_max = 0.0, dt = 0.0;
     int n = 0, steps_per_day = 0;
 
-    std::vector<double> market_path;
+    std::vector<double> market_path, increments;
     std::vector<Eigen::VectorXd> samples;
-
-    // proportions of the portfolio made up by individual securities. Total of values should sum to 1. 
+    Eigen::MatrixXd correlations;
     Eigen::VectorXd weights;
 
+    // I need a way to get the market scenario out of the constructor so that I can use it when I need to calculate the samples later on
     market_correlated_GRW(Eigen::VectorXd s_0_, Eigen::VectorXd mu_, Eigen::VectorXd sigma_, Eigen::MatrixXd correlations_, double T_max_, double dt_, market_scenario m, Eigen::VectorXd weights_){
         s_0 = s_0_;
         mu = mu_;
@@ -415,17 +410,9 @@ struct market_correlated_GRW{
         dt = dt_;
         n  = T_max/dt;
         steps_per_day = 1/dt;
-
-        // Correlation_Matrix CM = Correlation_Matrix(sigma_, correlations_);
-        // Corr = CM.C;
-        // l = CM.L;
-
-        // std::cout << "Completed correlation matrix calculations." << std::endl;
-
-        market_path = m.p;
-        
-        //samples = market_correlated_samples(l, m);
-        samples = market_correlated_samples(correlations_, m);
+        market_path = m.scenario();
+        increments = m.price_increments();
+        correlations = correlations_;
         weights = weights_;
 
         // check to make sure that the fractions of the overall portfolio made up by each security add to 1.
@@ -444,10 +431,12 @@ struct market_correlated_GRW{
     // calculate prices as a function of time, measured in days
     // the first component of the vector at each time step should be the market value at that time
     std::vector<Eigen::VectorXd> path(){
+
+        // calculate a new set of correlated samples
+        samples = market_correlated_samples(correlations, increments);
         
-        // create vector of VectorXds with size one greater than the number of stocks we want to consider. The first element should be the market scenario, 
-        // as described above.
-        //std::vector<Eigen::VectorXd> data(s_0.size()+1);
+        // create vector of VectorXds with size one greater than the number of stocks we want to consider. The first element should be the market 
+        // scenario, as described above.
         std::vector<Eigen::VectorXd> data;
         
         // the market scenario and the correlated GRWs at a given time step
@@ -456,20 +445,22 @@ struct market_correlated_GRW{
         
         for(int i=0; i<n; i++){
 
+            // samples needs to be calculated here, not referenced from somewhere else, that way each time we call path(), we get a new simulation
             z = samples[i];
 
-            // am I adding two vectors of the same size?
-            // I don't think it makes sense to multiply sigma*z, since they're both vectors. I think I should do the whole thing component-wise.
-            //s = s*(Eigen::VectorXd::Ones(s_0.size()) + mu*dt + sigma*z*sqrt(dt));
+            // for(int k=0; k<samples[i].size(); k++){
+            //     std::cout << z(i) << std::endl;
+            // }
 
+            // calculate each vector component of the prices
             for(int j=0; j<s.size(); j++){
-                s(j) = s(j)*(1+mu[j]*dt+sigma[j]*z[j]*sqrt(dt));
+                s(j) = s(j)*(1+mu(j)*dt+sigma(j)*z(j)*sqrt(dt));
             }
 
             values(0) = market_path[i];
 
-            for(int j=1; j<s.size(); j++){
-                values(j) = s(j-1);
+            for(int j=0; j<s.size(); j++){
+                values(j+1) = s(j);
             }
 
             data.push_back(values);
@@ -483,22 +474,23 @@ struct market_correlated_GRW{
 
         double counter = 0.0;
         double portfolio_value = 0.0;
-        Eigen::VectorXd path_end_values;
-        Eigen::VectorXd p = path().back();
+        Eigen::VectorXd security_end_values(s_0.size());
+        Eigen::VectorXd p(s_0.size());
 
         for(int i=0; i<num_trials; i++){
 
+            p = path().back();
+
             // copy path end values (except market scenario value) into new vector of just the security values
             for(int j=1; j<p.size(); j++){
-                path_end_values(j-i) = p(j);
+                security_end_values(j-1) = p(j);
             }            
 
-            portfolio_value = weights.dot(path_end_values);    
+            portfolio_value = weights.dot(security_end_values);    
 
             if(portfolio_value <= max_val && portfolio_value >= min_val){
                 counter++;
             }
-            
         }
 
         return counter/num_trials;
@@ -545,9 +537,9 @@ int main(){
 
     // first security has correlation 0.7 with the market, second has correlation 0.1. The securities are also correlated with each other with value 0.4.
     Eigen::MatrixXd correlations(num+1, num+1);
-    correlations << 1.0, 0.1, 0.03,
-                    0.1, 1.0, 0.3,
-                    0.03, 0.3, 1.0; 
+    correlations << 1.0, 0.8, 0.9,
+                    0.8, 1.0, 0.6,
+                    0.9, 0.6, 1.0; 
 
     // initial conditions for both securities
     Eigen::VectorXd s(num);
@@ -555,7 +547,7 @@ int main(){
 
     // drifts for each security
     Eigen::VectorXd mu(num);
-    mu << 0.05, 0.0;
+    mu << 0.0, 0.0;
 
     // Variances for the market and each security. We need to include the market variance because it is used when calculating the correlation matrix.
     Eigen::VectorXd sigma(num+1);
@@ -568,8 +560,15 @@ int main(){
     market_correlated_GRW mGRW = market_correlated_GRW(s, mu, sigma, correlations, 365, 1, m, weights);
 
     std::vector<Eigen::VectorXd> p = mGRW.path();
-
     mGRW.output_mGRW(p);
+
+    // total amount of money that we need to spend to buy the portfolio at t=0
+    double starting_val = weights.dot(s);
+
+    // probability of making money
+    double r = mGRW.risk(10000, starting_val, 1e300);
+
+    std::cout << r << std::endl;
 
     return 0;
 }
