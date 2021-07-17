@@ -371,7 +371,6 @@ struct market_GRW{
     }
 };
 
-
 struct market_correlated_GRW{
     /*
     Create a portfolio of possibly correlated securites that are also correlated with a market scenario.
@@ -428,74 +427,6 @@ struct market_correlated_GRW{
         }
     }
 
-    // calculate prices as a function of time, measured in days
-    // the first component of the vector at each time step should be the market value at that time
-    std::vector<Eigen::VectorXd> path(){
-
-        // calculate a new set of correlated samples
-        samples = market_correlated_samples(correlations, increments);
-        
-        // create vector of VectorXds with size one greater than the number of stocks we want to consider. The first element should be the market 
-        // scenario, as described above.
-        std::vector<Eigen::VectorXd> data;
-        
-        // the market scenario and the correlated GRWs at a given time step
-        Eigen::VectorXd values(s_0.size()+1);
-        s = s_0;
-        
-        for(int i=0; i<n; i++){
-
-            // samples needs to be calculated here, not referenced from somewhere else, that way each time we call path(), we get a new simulation
-            z = samples[i];
-
-            // for(int k=0; k<samples[i].size(); k++){
-            //     std::cout << z(i) << std::endl;
-            // }
-
-            // calculate each vector component of the prices
-            for(int j=0; j<s.size(); j++){
-                s(j) = s(j)*(1+mu(j)*dt+sigma(j)*z(j)*sqrt(dt));
-            }
-
-            values(0) = market_path[i];
-
-            for(int j=0; j<s.size(); j++){
-                values(j+1) = s(j);
-            }
-
-            data.push_back(values);
-        }
-
-        return data;
-    }
-
-    // returns the likelihood that the portfolio value ends in a given range
-    double risk(int num_trials, double min_val, double max_val){
-
-        double counter = 0.0;
-        double portfolio_value = 0.0;
-        Eigen::VectorXd security_end_values(s_0.size());
-        Eigen::VectorXd p(s_0.size());
-
-        for(int i=0; i<num_trials; i++){
-
-            p = path().back();
-
-            // copy path end values (except market scenario value) into new vector of just the security values
-            for(int j=1; j<p.size(); j++){
-                security_end_values(j-1) = p(j);
-            }            
-
-            portfolio_value = weights.dot(security_end_values);    
-
-            if(portfolio_value <= max_val && portfolio_value >= min_val){
-                counter++;
-            }
-        }
-
-        return counter/num_trials;
-    }
-
     // create files for each component of the GRW and the market scenario in the Data subdirectory
     void output_mGRW(std::vector<Eigen::VectorXd> v){
 
@@ -520,6 +451,100 @@ struct market_correlated_GRW{
             ofs.close();
         }
     }
+
+    // calculate prices as a function of time, measured in days
+    // the first component of the vector at each time step should be the market value at that time
+    std::vector<Eigen::VectorXd> path(){
+
+        // calculate a new set of correlated samples
+        samples = market_correlated_samples(correlations, increments);
+        
+        // create vector of VectorXds with size one greater than the number of securities we want to consider. The first element should be the market 
+        // scenario, as described above.
+        std::vector<Eigen::VectorXd> data;
+        
+        // the market scenario and the correlated GRWs at a given time step
+        Eigen::VectorXd values(s_0.size()+1);
+        s = s_0;
+        
+        for(int i=0; i<n; i++){
+
+            // samples needs to be calculated here, not referenced from somewhere else, that way each time we call path(), we get a new simulation
+            z = samples[i];
+
+            // calculate each vector component of the prices
+            for(int j=0; j<s.size(); j++){
+                s(j) = s(j)*(1+mu(j)*dt+sigma(j)*z(j)*sqrt(dt));
+            }
+
+            values(0) = market_path[i];
+
+            for(int j=0; j<s.size(); j++){
+                values(j+1) = s(j);
+            }
+
+            data.push_back(values);
+        }
+
+        return data;
+    }
+
+    // returns the likelihood that the portfolio value ends in a given range
+    double risk(int num_trials, double min_val, double max_val){
+
+        double counter = 0.0;
+        double portfolio_value = 0.0;
+        Eigen::VectorXd security_end_values(s_0.size());
+        Eigen::VectorXd p(s_0.size()+1);
+
+        for(int i=0; i<num_trials; i++){
+
+            p = path().back();
+
+            // copy path end values (except market scenario value) into new vector of just the security values
+            for(int j=1; j<p.size(); j++){
+                security_end_values(j-1) = p(j);
+            }            
+
+            portfolio_value = weights.dot(security_end_values);    
+
+            if(portfolio_value <= max_val && portfolio_value >= min_val){
+                counter++;
+            }
+        }
+
+        return counter/num_trials;
+    }
+
+    // calculate value at risk for the portfolio
+    double VaR(int num_trials, double confidence, double starting_val){
+
+        double x = 0.0;
+        double portfolio_value = 0.0;
+        Eigen::VectorXd security_end_values(s_0.size());
+        Eigen::VectorXd p(s_0.size()+1);    
+        std::vector<double> final_portfolio_values;
+
+        for(int i=0; i<num_trials; i++){
+
+            p = path().back();
+
+            // copy path end values (except market scenario value) into new vector of just the security values
+            for(int j=1; j<p.size(); j++){
+                security_end_values(j-1) = p(j);
+            }            
+
+            portfolio_value = weights.dot(security_end_values);    
+
+            final_portfolio_values.push_back(portfolio_value);
+        }
+
+        // after we sort the ending values, we want to solve cdf(z) = confidence for z to find the most money we can lose at the given confidence level
+        std::sort(final_portfolio_values.begin(), final_portfolio_values.end());
+        x = floor(confidence*final_portfolio_values.size());
+
+        return starting_val - final_portfolio_values[x];
+    }
 };
  
 int main(){
@@ -535,7 +560,7 @@ int main(){
 
     market_scenario m = market_scenario(market_drift, market_variance, 365, 1, fixed_times, fixed_prices);
 
-    // first security has correlation 0.7 with the market, second has correlation 0.1. The securities are also correlated with each other with value 0.4.
+    // first security has correlation 0.8 with the market, second has correlation 0.9. The securities are also correlated with each other with value 0.6.
     Eigen::MatrixXd correlations(num+1, num+1);
     correlations << 1.0, 0.8, 0.9,
                     0.8, 1.0, 0.6,
@@ -558,7 +583,6 @@ int main(){
     weights << 0.6, 0.4;
 
     market_correlated_GRW mGRW = market_correlated_GRW(s, mu, sigma, correlations, 365, 1, m, weights);
-
     std::vector<Eigen::VectorXd> p = mGRW.path();
     mGRW.output_mGRW(p);
 
@@ -567,8 +591,12 @@ int main(){
 
     // probability of making money
     double r = mGRW.risk(10000, starting_val, 1e300);
-
     std::cout << r << std::endl;
+
+    // portfolio value at risk
+    double v = mGRW.VaR(10000, 0.99, starting_val);
+    std::cout << "Var:" << v << std::endl;
+
 
     return 0;
 }
