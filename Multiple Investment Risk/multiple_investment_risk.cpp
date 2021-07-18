@@ -392,7 +392,7 @@ struct market_correlated_GRW{
     */
 
     Eigen::VectorXd s_0, s, mu, sigma, z;
-    double T_max = 0.0, dt = 0.0;
+    double T_max = 0.0, dt = 0.0, starting_value = 0.0;
     int n = 0, steps_per_day = 0;
 
     std::vector<double> market_path, increments;
@@ -400,7 +400,6 @@ struct market_correlated_GRW{
     Eigen::MatrixXd correlations;
     Eigen::VectorXd weights;
 
-    // I need a way to get the market scenario out of the constructor so that I can use it when I need to calculate the samples later on
     market_correlated_GRW(Eigen::VectorXd s_0_, Eigen::VectorXd mu_, Eigen::VectorXd sigma_, Eigen::MatrixXd correlations_, double T_max_, double dt_, market_scenario m, Eigen::VectorXd weights_){
         s_0 = s_0_;
         mu = mu_;
@@ -413,6 +412,7 @@ struct market_correlated_GRW{
         increments = m.price_increments();
         correlations = correlations_;
         weights = weights_;
+        starting_value = weights.dot(s_0);
 
         // check to make sure that the fractions of the overall portfolio made up by each security add to 1.
         double sum = 0;
@@ -586,17 +586,13 @@ int main(){
     std::vector<Eigen::VectorXd> p = mGRW.path();
     mGRW.output_mGRW(p);
 
-    // total amount of money that we need to spend to buy the portfolio at t=0
-    double starting_val = weights.dot(s);
-
     // probability of making money
-    double r = mGRW.risk(10000, starting_val, 1e300);
+    double r = mGRW.risk(10000, mGRW.starting_value, 1e300);
     std::cout << r << std::endl;
 
     // portfolio value at risk
-    double v = mGRW.VaR(10000, 0.99, starting_val);
+    double v = mGRW.VaR(10000, 0.99, mGRW.starting_value);
     std::cout << "Var:" << v << std::endl;
-
 
     return 0;
 }
