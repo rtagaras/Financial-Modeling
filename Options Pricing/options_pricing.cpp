@@ -27,32 +27,70 @@ double gen_uniform(double min, double max){
     return d(gen);
 }
 
+struct GRW{
+    /*
+    geometric random walk with drift mu and volatility sigma
+    T_max gives number of time units for which to calculate the path, dt is number of steps per unit time
+    s_0 is initial security price at day zero
+    */
+
+    double mu, sigma, T_max, dt, s_0, s, z;
+    int n;
+
+    GRW(double s_0_, double mu_, double sigma_, double T_max_, double dt_){
+        s_0 = s_0_;
+        mu = mu_;
+        sigma = sigma_;
+        T_max = T_max_; 
+        dt = dt_;
+        n  = T_max/dt;
+    }
+
+    // calculate price as a function of time, measured in days
+    std::vector<double> path(){
+        std::vector<double> data;
+
+        s = s_0;
+        
+        for(int i=0; i<n; i++){
+
+            z = gen_norm(0.0, 1.0);
+            s = s*(1.0 + mu*dt+sigma*z*sqrt(dt));
+
+            data.push_back(s);
+        }
+
+        return data;
+    }
+};
+
 class European_Option{
     private:
 
-    double strike = 0.0, expiry_time = 0.0, underlying_value = 0.0, risk_free_rate = 0.0, drift = 0.0, variance = 0.0;
+    double strike, s_0, r, mu, sigma;
+    int expiry_time, dt;
     std::string type;
 
     public:
 
-    European_Option(std::string type_, double strike_, double expiry_time_, double underlying_value_, double risk_free_rate_, double drift_, double variance_){
+    European_Option(std::string type_, double strike_, int expiry_time_, int dt, double s_0_, double r_, double s_, double mu_, double sigma_){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
-        underlying_value = underlying_value_;
-        risk_free_rate = risk_free_rate_;
-        drift = drift_;
-        variance = variance_;
+        s_0 = s_0_;
+        r = r_;
+        mu = mu_;
+        sigma = sigma_;
     }
 
-    double payout(){
+    double payout(double x){
 
         if(type == "call"){
-            return std::max(underlying_value - strike, 0.0);
+            return std::max(x - strike, 0.0);
         }
 
         else if(type == "put"){
-            return std::max(strike - underlying_value, 0.0);
+            return std::max(strike - x, 0.0);
         }
 
         else{
@@ -63,45 +101,61 @@ class European_Option{
 
     // We calculate the expected payoff and discount the price by using the risk free rate, following the risk-neutral principal. This is computationally
     // simpler than implementing a recursive solution, although potentially less flexible. 
-    double binomial_lattice_price(double s_0, int num_trials){
+    double binomial_lattice_price(int num_trials){
 
         double E = 0.0, x = 0.0;
         double dt = 1./365;
         
         // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
-        double A = (exp(-drift*dt)+exp((drift+variance*variance)*dt))/2.;
+        double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
         double d = A - sqrt(A*A - 1.0);
         double u = A + sqrt(A*A - 1.0);
-        double p = (exp(drift*dt)-d)/(u-d);
+        double p = (exp(mu*dt)-d)/(u-d);
 
         if(p <= 0 || p >= 1){
-            d = exp(drift*dt)*(1.0 - sqrt(exp(variance*variance*dt) - 1.0));
-            u = exp(drift*dt)*(1.0 + sqrt(exp(variance*variance*dt) - 1.0));
+            d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
+            u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
             p = 0.5;
         }
 
         // calculate many paths through the lattice, adding the final payout to a running total
         for(int i=0; i<num_trials; i++){
-            underlying_value = s_0;
+            double s = s_0;
 
             for(int j=0; j<expiry_time; j++){
                 x = gen_uniform(0,1);
 
                 if(x > p){
-                    underlying_value = underlying_value*u;
+                    s = s*u;
                 }
 
                 else{
-                    underlying_value = underlying_value*d;
+                    s = s*d;
                 }
             }
 
-            E += payout();
+            E += payout(s);
         }
 
         // return the average payout, discounted by the RFR to t=0
         E = E/num_trials;
-        return exp(-expiry_time*risk_free_rate*dt)*E;
+        return exp(-expiry_time*r*dt)*E;
+    }
+
+    // prices should follow geometric brownian motion - use a GRW to simulate end price
+    double GRW_price(int n){
+        double x = 0.0, s = 0.0;
+        GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
+        std::vector<double> p;
+
+        for(int i=0; i<n; i++){
+            s = s_0;
+            p = g.path();
+
+            x += p.back();
+        }
+
+        return exp(-r*expiry_time)*x/n;
     }
 
 };
@@ -111,14 +165,15 @@ class American_Option{
 
     double strike, s_0, r, mu, sigma;
     std::string type;
-    int expiry_time;
+    int expiry_time, dt;
 
     public:
 
-    American_Option(std::string type_, double strike_, int expiry_time_, double s_0_, double r_, double mu_, double sigma_){
+    American_Option(std::string type_, double strike_, int expiry_time_, int dt_, double s_0_, double r_, double mu_, double sigma_){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
+        dt = dt_;
         s_0 = s_0_;
         r = r_;
         mu = mu_;
@@ -190,9 +245,5 @@ class American_Option{
 
 int main(){
   
-    American_Option O = American_Option("put", 49, 5, 50, 0.26, 0.26, 0.4);
-
-    std::cout << O.binomial_lattice_price() << std::endl;
-
     return 0;
 }
