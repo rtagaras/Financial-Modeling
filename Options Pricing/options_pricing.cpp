@@ -63,16 +63,13 @@ struct GRW{
     }
 };
 
-class European_Option{
-    private:
-
+class Option{
+    public:
     double strike, s_0, r, mu, sigma, dt;
     int expiry_time;
     std::string type;
 
-    public:
-
-    European_Option(std::string type_, double strike_, int expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_){
+    Option(std::string type_, double strike_, int expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
@@ -98,6 +95,12 @@ class European_Option{
             return 0;
         }
     }
+};
+
+class European_Option : public Option{
+    
+    public:
+    using Option::Option;
 
     // We calculate the expected payoff and discount the price by using the risk free rate, following the risk-neutral principal. This is computationally
     // simpler than implementing a recursive solution, although potentially less flexible. 
@@ -147,51 +150,20 @@ class European_Option{
         std::vector<double> p;
 
         for(int i=0; i<n; i++){
-            GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
+            GRW g = GRW(s_0, mu, sigma, expiry_time/365., dt);
 
             p = g.path();
             x += payout(p.back());
         }
 
-        return exp(-r*expiry_time)*x/n;
+        return exp(-r*expiry_time/365.)*x/n;
     }
 };
 
-class American_Option{
-    private:
-
-    double strike, s_0, r, mu, sigma, dt;
-    std::string type;
-    int expiry_time;
-
+class American_Option : public Option{
+    
     public:
-
-    American_Option(std::string type_, double strike_, int expiry_time_, int dt_, double s_0_, double r_, double mu_, double sigma_){
-        type = type_;
-        strike = strike_;
-        expiry_time = expiry_time_;
-        dt = dt_;
-        s_0 = s_0_;
-        r = r_;
-        mu = mu_;
-        sigma = sigma_;
-    }
-
-    double payout(double s){
-
-        if(type == "call"){
-            return std::max(s - strike, 0.0);
-        }
-
-        else if(type == "put"){
-            return std::max(strike - s, 0.0);
-        }
-
-        else{
-            std::cout << "Invalid option type" << std::endl;
-            return 0;
-        }
-    }
+    using Option::Option;
 
     double binomial_lattice_price(){
 
@@ -210,23 +182,23 @@ class American_Option{
             p = 0.5;
         //}
     
-        Eigen::MatrixXd underlying_lattice(expiry_time, expiry_time);
-        Eigen::MatrixXd option_lattice(expiry_time, expiry_time);
+        Eigen::MatrixXd underlying_lattice(expiry_time+1, expiry_time+1);
+        Eigen::MatrixXd option_lattice(expiry_time+1, expiry_time+1);
 
         // calculate underlying values
-        for(int i=0; i<expiry_time; i++){
+        for(int i=0; i<expiry_time+1; i++){
             for(int j=0; j<i+1; j++){
                 underlying_lattice(i,j) = s_0*pow(u,j)*pow(d,i-j);
             }
         }
 
         // calculate all possible option payouts
-        for(int j=0; j<expiry_time; j++){
-            option_lattice(expiry_time-1, j) = payout(underlying_lattice(expiry_time-1, j));
+        for(int j=0; j<expiry_time+1; j++){
+            option_lattice(expiry_time, j) = payout(underlying_lattice(expiry_time, j));
         }
 
         // backpropagate option value to t=0
-        for(int i=expiry_time-2; i>=0; i--){
+        for(int i=expiry_time-1; i>=0; i--){
             for(int j=0; j<i+1; j++){
 
                 //calculate option price from child nodes and compare to value obtained by exercising the option
@@ -240,16 +212,18 @@ class American_Option{
 
 };
 
-class Asian_Option{
+class Asian_Option : public Option{
 
 };
 
 int main(){
 
-    European_Option O = European_Option("put", 49.0, 4.0, 0.01, 50.0, 0.26, 0.26, 0.4);
+    European_Option O = European_Option("put", 49.0, 4.0, 1/365., 50.0, 0.26, 0.26, 0.4);
 
     std::cout << "Binomial lattice price: " << O.binomial_lattice_price(10000) << std::endl << "GRW price: " << O.GRW_price(10000) << std::endl;
 
-    
+    American_Option A = American_Option("put", 49.0, 4.0, 1/365., 50.0, 0.26, 0.26, 0.4);
+
+    std::cout << "American price: " << A.binomial_lattice_price() << std::endl;
     return 0;
 }
