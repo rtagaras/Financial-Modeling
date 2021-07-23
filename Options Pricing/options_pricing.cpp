@@ -1,9 +1,7 @@
 #include <iostream>
 #include <random>
-#include <fstream>
 #include <string>
 #include <vector>
-#include <algorithm>
 #include <Eigen/Dense>
 
 using Eigen::MatrixXd;
@@ -64,6 +62,11 @@ struct GRW{
 };
 
 class Option{
+    /*
+    Base class for a general option
+
+    s_0 is initial underlying value, r is risk-free rate (measured in percent/year), mu is drift, sigma is volatility, expiry time is measured in days
+    */
     public:
     double strike, s_0, r, mu, sigma, dt;
     int expiry_time;
@@ -213,17 +216,41 @@ class American_Option : public Option{
 };
 
 class Asian_Option : public Option{
+    public:
+    using Option::Option;
 
+    double fixed_strike_GRW_price(int n){
+        double x = 0.0, s = 0.0;
+        std::vector<double> p;
+
+        for(int i=0; i<n; i++){
+            GRW g = GRW(s_0, mu, sigma, expiry_time/365., dt);
+
+            s = 0.0;
+            p = g.path();
+
+            // get average price over entire random walk
+            for(int j=0; j<p.size(); j++){
+                s += p[j]/p.size();
+            }
+
+            x += payout(s);
+        }
+
+        return exp(-r*expiry_time/365.)*x/n;
+    }
 };
 
 int main(){
 
-    European_Option O = European_Option("put", 49.0, 4.0, 1/365., 50.0, 0.26, 0.26, 0.4);
+    European_Option E = European_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
+    std::cout << "European lattice price: " << E.binomial_lattice_price(10000) << std::endl << "European GRW price: " << E.GRW_price(10000) << std::endl;
+    
+    American_Option A = American_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
+    std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
 
-    std::cout << "Binomial lattice price: " << O.binomial_lattice_price(10000) << std::endl << "GRW price: " << O.GRW_price(10000) << std::endl;
+    Asian_Option As = Asian_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
+    std::cout << "Asian GRW price: " << As.fixed_strike_GRW_price(10000) << std::endl;
 
-    American_Option A = American_Option("put", 49.0, 4.0, 1/365., 50.0, 0.26, 0.26, 0.4);
-
-    std::cout << "American price: " << A.binomial_lattice_price() << std::endl;
     return 0;
 }
