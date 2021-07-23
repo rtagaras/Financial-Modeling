@@ -49,7 +49,6 @@ struct GRW{
     // calculate price as a function of time, measured in days
     std::vector<double> path(){
         std::vector<double> data;
-
         s = s_0;
         
         for(int i=0; i<n; i++){
@@ -67,13 +66,13 @@ struct GRW{
 class European_Option{
     private:
 
-    double strike, s_0, r, mu, sigma;
-    int expiry_time, dt;
+    double strike, s_0, r, mu, sigma, dt;
+    int expiry_time;
     std::string type;
 
     public:
 
-    European_Option(std::string type_, double strike_, int expiry_time_, int dt, double s_0_, double r_, double s_, double mu_, double sigma_){
+    European_Option(std::string type_, double strike_, int expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
@@ -81,6 +80,7 @@ class European_Option{
         r = r_;
         mu = mu_;
         sigma = sigma_;
+        dt = dt_;
     }
 
     double payout(double x){
@@ -104,19 +104,18 @@ class European_Option{
     double binomial_lattice_price(int num_trials){
 
         double E = 0.0, x = 0.0;
-        double dt = 1./365;
         
-        // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
-        double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
-        double d = A - sqrt(A*A - 1.0);
-        double u = A + sqrt(A*A - 1.0);
-        double p = (exp(mu*dt)-d)/(u-d);
+        // // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
+        // double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
+        // double d = A - sqrt(A*A - 1.0);
+        // double u = A + sqrt(A*A - 1.0);
+        // double p = (exp(mu*dt)-d)/(u-d);
 
-        if(p <= 0 || p >= 1){
-            d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
-            u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
-            p = 0.5;
-        }
+        //if(p <= 0 || p >= 1){
+            double d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
+            double u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
+            double p = 0.5;
+        //}
 
         // calculate many paths through the lattice, adding the final payout to a running total
         for(int i=0; i<num_trials; i++){
@@ -144,28 +143,26 @@ class European_Option{
 
     // prices should follow geometric brownian motion - use a GRW to simulate end price
     double GRW_price(int n){
-        double x = 0.0, s = 0.0;
-        GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
+        double x = 0.0;
         std::vector<double> p;
 
         for(int i=0; i<n; i++){
-            s = s_0;
-            p = g.path();
+            GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
 
-            x += p.back();
+            p = g.path();
+            x += payout(p.back());
         }
 
         return exp(-r*expiry_time)*x/n;
     }
-
 };
 
 class American_Option{
     private:
 
-    double strike, s_0, r, mu, sigma;
+    double strike, s_0, r, mu, sigma, dt;
     std::string type;
-    int expiry_time, dt;
+    int expiry_time;
 
     public:
 
@@ -243,7 +240,16 @@ class American_Option{
 
 };
 
+class Asian_Option{
+
+};
+
 int main(){
-  
+
+    European_Option O = European_Option("put", 49.0, 4.0, 0.01, 50.0, 0.26, 0.26, 0.4);
+
+    std::cout << "Binomial lattice price: " << O.binomial_lattice_price(10000) << std::endl << "GRW price: " << O.GRW_price(10000) << std::endl;
+
+    
     return 0;
 }
