@@ -9,3 +9,5 @@ European options (binomial lattice, geometric Brownian motion)
 American options (binomial lattice)
 
 Fixed strike Asian options (geometric Brownian motion)
+
+Barrier Options (geometric Brownian motion)
