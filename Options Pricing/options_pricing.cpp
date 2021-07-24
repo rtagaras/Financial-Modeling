@@ -77,10 +77,12 @@ class Option{
         strike = strike_;
         expiry_time = expiry_time_;
         s_0 = s_0_;
+        dt = dt_/365.;
+        
+        // 
         r = r_;
         mu = mu_;
         sigma = sigma_;
-        dt = dt_;
     }
 
     double payout(double x){
@@ -111,16 +113,16 @@ class European_Option : public Option{
 
         double E = 0.0, x = 0.0;
         
-        // // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
-        // double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
-        // double d = A - sqrt(A*A - 1.0);
-        // double u = A + sqrt(A*A - 1.0);
-        // double p = (exp(mu*dt)-d)/(u-d);
+        // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
+        double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
+        double d = A - sqrt(A*A - 1.0);
+        double u = A + sqrt(A*A - 1.0);
+        double p = (exp(mu*dt)-d)/(u-d);
 
         //if(p <= 0 || p >= 1){
-            double d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
-            double u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
-            double p = 0.5;
+            d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
+            u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
+            p = 0.5;
         //}
 
         // calculate many paths through the lattice, adding the final payout to a running total
@@ -153,13 +155,13 @@ class European_Option : public Option{
         std::vector<double> p;
 
         for(int i=0; i<n; i++){
-            GRW g = GRW(s_0, mu, sigma, expiry_time/365., dt);
+            GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
 
             p = g.path();
             x += payout(p.back());
         }
 
-        return exp(-r*expiry_time/365.)*x/n;
+        return exp(-r*expiry_time)*x/n;
     }
 };
 
@@ -171,7 +173,7 @@ class American_Option : public Option{
     double binomial_lattice_price(){
 
         double x = 0.0;
-        double dt = 1./365;
+        int n = expiry_time;
         
         // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
         double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
@@ -179,29 +181,29 @@ class American_Option : public Option{
         double u = A + sqrt(A*A - 1.0);
         double p = (exp(mu*dt)-d)/(u-d);
 
-        //if(p <= 0 || p >= 1){
+        if(p <= 0 || p >= 1){
             d = exp(mu*dt)*(1.0 - sqrt(exp(sigma*sigma*dt) - 1.0));
             u = exp(mu*dt)*(1.0 + sqrt(exp(sigma*sigma*dt) - 1.0));
             p = 0.5;
-        //}
+        }
     
-        Eigen::MatrixXd underlying_lattice(expiry_time+1, expiry_time+1);
-        Eigen::MatrixXd option_lattice(expiry_time+1, expiry_time+1);
+        Eigen::MatrixXd underlying_lattice(n+1, n+1);
+        Eigen::MatrixXd option_lattice(n+1, n+1);
 
         // calculate underlying values
-        for(int i=0; i<expiry_time+1; i++){
+        for(int i=0; i<n+1; i++){
             for(int j=0; j<i+1; j++){
                 underlying_lattice(i,j) = s_0*pow(u,j)*pow(d,i-j);
             }
         }
 
         // calculate all possible option payouts
-        for(int j=0; j<expiry_time+1; j++){
-            option_lattice(expiry_time, j) = payout(underlying_lattice(expiry_time, j));
+        for(int j=0; j<n+1; j++){
+            option_lattice(n, j) = payout(underlying_lattice(n, j));
         }
 
         // backpropagate option value to t=0
-        for(int i=expiry_time-1; i>=0; i--){
+        for(int i=n-1; i>=0; i--){
             for(int j=0; j<i+1; j++){
 
                 //calculate option price from child nodes and compare to value obtained by exercising the option
@@ -224,7 +226,7 @@ class Asian_Option : public Option{
         std::vector<double> p;
 
         for(int i=0; i<n; i++){
-            GRW g = GRW(s_0, mu, sigma, expiry_time/365., dt);
+            GRW g = GRW(s_0, mu, sigma, expiry_time, dt);
 
             s = 0.0;
             p = g.path();
@@ -237,20 +239,82 @@ class Asian_Option : public Option{
             x += payout(s);
         }
 
-        return exp(-r*expiry_time/365.)*x/n;
+        return exp(-r*expiry_time)*x/n;
+    }
+};
+
+class Barrier_Option : public Option{
+
+    private:
+    double E = 0.0, s = 0.0, b, d1 = 0.0, d2 = 0.0, z, u;
+    int n;
+    bool crossed = 0;
+
+    public:
+    Barrier_Option(std::string type_, double strike_, double barrier_, int expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_) 
+        : Option(type_, strike_, expiry_time_, dt_, s_0_, r_, mu_, sigma_){
+        
+        b = barrier_;
+        n = expiry_time/dt;
+    }
+
+    double GRW_price(int num_trials){
+        for(int i=0; i<num_trials; i++){
+
+            crossed = 0;
+            s = s_0;
+            d1 = b-s_0;
+
+            for(int j=0; j<n; j++){
+
+                // normal GRW calculation
+                z = gen_norm(0,1);
+                s = s*(1.0 + mu*dt + sigma*z*sqrt(dt));
+                d2 = b-s;
+
+                // use Brownian bridge to decide if barier has been crossed, which makes option value zero
+                u = gen_uniform(0,1);
+                if(u < exp(-2.*d1*d2/(sigma*sigma*dt))){
+                    crossed = 1;
+                }
+
+                d1 = d2;
+            }
+
+            if(crossed == 0){
+                E += payout(s);
+            }
+        }
+
+        return E*exp(-r*expiry_time)/num_trials;
     }
 };
 
 int main(){
 
-    European_Option E = European_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
-    std::cout << "European lattice price: " << E.binomial_lattice_price(10000) << std::endl << "European GRW price: " << E.GRW_price(10000) << std::endl;
-    
-    American_Option A = American_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
+    std::string type = "put";
+    double s_0 = 100;
+    double strike = 100;
+    double r = 0.03;
+    double sigma = 0.2;
+    int days_to_expiry = 60;
+    double dt = 0.01;
+    double barrier = 105;
+
+    European_Option E1 = European_Option(type, strike, days_to_expiry, dt, s_0, r, r, sigma);
+    std::cout << "European GRW price: " << E1.GRW_price(10000) << std::endl;
+
+    European_Option E2 = European_Option(type, strike-51., days_to_expiry-56., dt+0.99, s_0-50., r+0.23, r+0.23, sigma+0.2);
+    std::cout << "European lattice price: " << E2.binomial_lattice_price(10000) << std::endl;
+
+    American_Option A = American_Option(type, strike-51., days_to_expiry-56., dt+0.99, s_0-50., r+0.23, r+0.23, sigma+0.2);
     std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
 
-    Asian_Option As = Asian_Option("put", 100., 60., 0.01/365., 100., 0.03, 0.03, 0.2);
-    std::cout << "Asian GRW price: " << As.fixed_strike_GRW_price(10000) << std::endl;
+    Asian_Option As = Asian_Option(type, strike, days_to_expiry, dt*10, s_0, r, r, sigma);
+    std::cout << "Asian GRW price: " << As.fixed_strike_GRW_price(100) << std::endl;
+
+    Barrier_Option B = Barrier_Option(type, strike, barrier, days_to_expiry, dt, s_0, r, r, sigma);    
+    std::cout << "Knock-out option GRW price: " << B.GRW_price(100) << std::endl;
 
     return 0;
 }
