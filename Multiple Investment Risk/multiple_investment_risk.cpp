@@ -11,7 +11,7 @@ using Eigen::MatrixXd;
 template<class T>
 void output(std::vector<T> v, std::string filename){
     /*
-    write a vector to a .txt file and store it in the Data subdirectory
+    write a vector to a .txt file and store it in the Data subdirectory 
     */
 
     std::ofstream ofs;
