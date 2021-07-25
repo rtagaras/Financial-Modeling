@@ -11,3 +11,7 @@ American options (binomial lattice)
 Fixed strike Asian options (geometric Brownian motion)
 
 Barrier Options (geometric Brownian motion)
+
+Basket Options (geometric Brownian motion)
+
+Exchange Options (geometric Brownian motion)
