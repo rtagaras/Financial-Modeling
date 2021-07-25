@@ -464,6 +464,54 @@ class Basket_Option{
     }
 };
 
+class Exchange_Option {
+    private:
+    double A_0, B_0, correlation, mu1, mu2, sigma1, sigma2, r, dt, expiry_time;
+    std::vector<double> p1, p2;
+    int n;
+
+    public:
+    Exchange_Option(double A_0_, double B_0_, double correlation_, double mu1_, double mu2_, double sigma1_, double sigma2_, double r_, double dt_, double expiry_time_){
+        correlation = correlation_;
+        expiry_time = expiry_time_;
+        dt = dt_;
+        A_0 = A_0_;
+        B_0 = B_0_;
+        r = r_;
+        mu1 = mu1_;
+        mu2 = mu2_;
+        sigma1 = sigma1_;
+        sigma2 = sigma2_;
+        n = expiry_time/dt;
+    }
+
+    double payout(double x){
+        return std::max(x, 0.0);
+    }
+
+    double GRW_value(int num_trials){
+        
+        double E = 0.0, A, B, z1, z2, x;
+        for(int i=0; i<num_trials; i++){
+            A = A_0;
+            B = B_0;
+
+            for(int j=0; j<n; j++){
+                z1 = gen_norm(0,1);
+                z2 = gen_norm(0,1);
+                x = correlation*z1 + sqrt(1-correlation*correlation)*z2;
+
+                A += A*(mu1*dt + sigma1*z1*sqrt(dt));
+                B += B*(mu2*dt + sigma2*x*sqrt(dt)); 
+            }
+            
+            E += payout(A-B);
+        }
+        return E*exp(-r*expiry_time)/num_trials;
+    }
+    
+};
+
 int main(){
 
     // general parameters
@@ -495,7 +543,7 @@ int main(){
     sigma_B << 0.2, 0.2, 0.2;
 
 
-    // 
+
     European_Option E1 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
     std::cout << "European GRW price: " << E1.GRW_price(1000) << std::endl;
 
@@ -514,6 +562,9 @@ int main(){
     Basket_Option Ba = Basket_Option(type, strike, weights, correlations, expiry_time, dt, s_0_B, r, mu, sigma_B);
     std::cout << "Basket GRW price: " << Ba.GRW_value(100) << std::endl;
 
+    Exchange_Option E = Exchange_Option(100, 100, 0.6, -0.05, -0.03, 0.2, 0.2, 0.03, 1/365., 90/365.);
+    std::cout << "Exchange GRW price: " << E.GRW_value(10000) << std::endl;
+
 
     // KNOWN VALUES
     //
@@ -525,6 +576,7 @@ int main(){
     // Asian GRW        | 1.75  |     Y
     // Barrier GRW      | 2.57  |     Y
     // Basket GRW       | 2.62  |     Y
+    // Exchange GRW     | 3.24  |     Y
 
     return 0;
 }
