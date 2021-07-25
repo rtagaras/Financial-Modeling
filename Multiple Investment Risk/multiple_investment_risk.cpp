@@ -287,7 +287,7 @@ struct correlated_GRW{
     mu is a vector that holds the drift parameter for each component. Similarly, sigma is the volatility vector. 
     T_max gives the number of days for which to calculate the path.
     s_0 is the initial price vector at day zero.
-    correlations is a strictly upper triangular matrix containing the correlation coefficients rho_{ij}
+    correlations is a symmetric diagonal matrix containing the correlation coefficients rho_{ij}
     */
 
     // final correlation matrix 
