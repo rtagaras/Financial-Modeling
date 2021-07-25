@@ -37,8 +37,8 @@ double gen_norm(double mean, double variance){
 struct GRW{
     /*
     geometric random walk with drift mu and volatility sigma
-    T_max gives number of days for which to calculate the path
-    s_0 is initial security price at day zero
+    T_max gives number of years for which to calculate the path
+    s_0 is initial security price at t=0
     */
 
     double mu = 0.0, sigma = 0.0, T_max = 0.0, dt = 0.0, s_0 = 0.0, s = 0.0, z = 0.0;
@@ -54,7 +54,7 @@ struct GRW{
         steps_per_day = 1/dt;
     }
 
-    // calculate price as a function of time, measured in days
+    // calculate price as a function of time, measured in years
     std::vector<double> path(){
         std::vector<double> data;
 
@@ -285,8 +285,8 @@ struct correlated_GRW{
     A vector-valued geometric random walk where components have correlated price increments. 
 
     mu is a vector that holds the drift parameter for each component. Similarly, sigma is the volatility vector. 
-    T_max gives the number of days for which to calculate the path.
-    s_0 is the initial price vector at day zero.
+    T_max gives the number of years for which to calculate the path.
+    s_0 is the initial price vector at t=0.
     correlations is a symmetric diagonal matrix containing the correlation coefficients rho_{ij}
     */
 
@@ -309,12 +309,12 @@ struct correlated_GRW{
         n  = T_max/dt;
         steps_per_day = 1/dt;
 
-        Correlation_Matrix CM = Correlation_Matrix(sigma_, correlations_);
+        Correlation_Matrix CM = Correlation_Matrix(Eigen::VectorXd::Ones(sigma.size()), correlations_);
         Corr = CM.C;
         l = CM.L;
     }
 
-    // calculate price as a function of time, measured in days
+    // calculate price as a function of time, measured in years
     std::vector<Eigen::VectorXd> path(){
         
         std::vector<Eigen::VectorXd> data;
