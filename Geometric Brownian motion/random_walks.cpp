@@ -25,8 +25,8 @@ double gen_norm(double mean, double variance){
 }
 
 // geometric random walk with drift mu and volatility sigma
-// T_max gives number of days to calculate path for
-// s_0 is initial stock price at day zero
+// T_max gives number of years to calculate path for
+// s_0 is initial stock price at t=0 zero
 struct GRW{
 
     double mu, sigma, T_max, dt, s_0, s, z, RFR, yield, div;
@@ -45,7 +45,7 @@ struct GRW{
         steps_per_day = 1/dt;
     }
 
-    // calculate price as a function of time, measured in days
+    // calculate price as a function of time, measured in years
     std::vector<double> path(){
 
         std::vector<double> data;
@@ -131,9 +131,9 @@ int main(){
         //p = g.path_with_dividends();
         end_val = p.back();
 
-        // if (end_val > 100){
-        //     profit_count++;
-        // }
+        if (end_val > 100){
+            profit_count++;
+        }
 
         filename = "data"+ std::to_string(i);
         output(p, filename);
@@ -142,7 +142,7 @@ int main(){
     }
 
     output(end_values, "end_values");
-    //std::cout << "Probability of profit: " << (double) profit_count/num_trials << std::endl;
+    std::cout << "Probability of profit: " << (double) profit_count/num_trials << std::endl;
  
     return 0;
 }
