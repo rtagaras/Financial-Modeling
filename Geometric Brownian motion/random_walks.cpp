@@ -8,7 +8,7 @@
 template<class T>
 void output(std::vector<T> v, std::string filename){
     std::ofstream ofs;
-    ofs.open(filename + ".txt");
+    ofs.open("./Data/" + filename + ".txt");
     
     for(int i=0; i<v.size(); i++){
         ofs << v[i] << '\n';
@@ -29,8 +29,8 @@ double gen_norm(double mean, double variance){
 // s_0 is initial stock price at day zero
 struct GRW{
 
-    double mu, sigma, T_max, dt, s_0, s, z, RFR, yield, div = 0.0;
-    int n, days_between_divs, days_since_div, steps_per_day = 0;
+    double mu, sigma, T_max, dt, s_0, s, z, RFR, yield, div;
+    int n, days_between_divs, days_since_div, steps_per_day;
 
     GRW(double s_0_, double mu_, double sigma_, double T_max_, double dt_, int days_between_divs_ = 0, double RFR_ = 0.0, double yield_ = 0.0){
         s_0 = s_0_;
@@ -47,10 +47,10 @@ struct GRW{
 
     // calculate price as a function of time, measured in days
     std::vector<double> path(){
-        std::vector<double> data;
 
+        std::vector<double> data;
         s = s_0;
-        
+        data.push_back(s_0);
         for(int i=0; i<n; i++){
 
             z = gen_norm(0.0, 1.0);
@@ -111,27 +111,29 @@ int main(){
     int profit_count = 0;
 
     // Parameters
-    int num_trials = 10000;
+    int num_trials = 100000;
     double starting_price = 100.0;
-    double mu = 0.1;
-    double sigma = 0.04;
-    double T_max = 365.0;
-    double dt = 0.1;
+    double mu = 0.0;
+    double sigma = 0.4;
+    double T_max = 60/365.;
+    double dt = 1/365.;
     int days_between_divs = 91;
     double RFR = 0.02;
     double yield = 0.08;
 
-    // Create 100000 instances of geometric brownian motion with a dividend. 
+    // Create 10000 instances of geometric brownian motion with a dividend. 
     // Here, we consider the paths and also store the ending values.
     GRW g = GRW(starting_price, mu, sigma, T_max, dt, days_between_divs, RFR, yield);
 
     for(int i=0; i<num_trials; i++){
-        p = g.path_with_dividends();
+        p = g.path();
+        
+        //p = g.path_with_dividends();
         end_val = p.back();
 
-        if (end_val > 100){
-            profit_count++;
-        }
+        // if (end_val > 100){
+        //     profit_count++;
+        // }
 
         filename = "data"+ std::to_string(i);
         output(p, filename);
@@ -140,7 +142,7 @@ int main(){
     }
 
     output(end_values, "end_values");
-    std::cout << "Probability of profit: " << (double) profit_count/num_trials << std::endl;
+    //std::cout << "Probability of profit: " << (double) profit_count/num_trials << std::endl;
  
     return 0;
 }
