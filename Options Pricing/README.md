@@ -15,3 +15,5 @@ Barrier Options (geometric Brownian motion)
 Basket Options (geometric Brownian motion)
 
 Exchange Options (geometric Brownian motion)
+
+Bermudan Options (binomial lattice)
