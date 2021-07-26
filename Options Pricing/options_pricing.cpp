@@ -2,9 +2,26 @@
 #include <random>
 #include <string>
 #include <vector>
+#include <fstream>
 #include <Eigen/Dense>
 
 using Eigen::MatrixXd;
+
+template<class T>
+void output(std::vector<T> v, std::string filename){
+    /*
+    write a vector to a .txt file and store it in the Data subdirectory 
+    */
+
+    std::ofstream ofs;
+    ofs.open("./Data/" + filename + ".txt");
+    
+    for(int i=0; i<v.size(); i++){
+        ofs << v[i] << '\n';
+    }
+    
+    ofs.close();
+}
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -231,7 +248,7 @@ class European_Option : public Option{
     // simpler than implementing a recursive solution, although potentially less flexible. 
     double binomial_lattice_price(int num_trials){
 
-        double E = 0.0, x = 0.0;
+        double E = 0.0, x = 0.0, y;
         
         // start by using the u=1/d convention for binomial factors; if this leads to unphysical results, use p=1/2 convention instead
         double A = (exp(-mu*dt)+exp((mu+sigma*sigma)*dt))/2.;
@@ -260,13 +277,15 @@ class European_Option : public Option{
                     s = s*d;
                 }
             }
-
-            E += payout(s);
+            y = exp(-expiry_time*r*dt)*payout(s);
+            samples.push_back(y);
+            //E += payout(s);
+            E += y;
         }
 
         // return the average payout, discounted by the RFR to t=0
-        E = E/num_trials;
-        return exp(-expiry_time*r*dt)*E;
+        //return exp(-expiry_time*r*dt)*E/num_trials;
+        return E/num_trials;
     }
 
     // prices should follow geometric brownian motion - use a GRW to simulate end price
@@ -340,7 +359,7 @@ class American_Option : protected Option{
     }
 };
 
-class Asian_Option : protected Option{
+class Asian_Option : public Option{
     public:
     using Option::Option;
 
@@ -368,7 +387,7 @@ class Asian_Option : protected Option{
     }
 };
 
-class Barrier_Option : protected Option{
+class Barrier_Option : public Option{
 
     private:
     double E = 0.0, s = 0.0, b, d1 = 0.0, d2 = 0.0, z, u;
@@ -612,7 +631,7 @@ int main(){
     double r = 0.03;
     double sigma = 0.2;
     double expiry_time = 60/365.;
-    double dt = 0.01/365.;
+    double dt = 1/365.;
     double barrier = 105;
 
     // Parameters for basket option
@@ -635,29 +654,35 @@ int main(){
 
     std::vector<double> exercise_dates = {18, 36, 54, 72};
 
-    // European_Option E1 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
-    // std::cout << "European GRW price: " << E1.GRW_price(1000) << std::endl;
+    European_Option E1 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
+    double E1_val = E1.GRW_price(10000);
+    output(E1.samples, "European_GRW");
 
-    // European_Option E2 = European_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
-    // std::cout << "European lattice price: " << E2.binomial_lattice_price(10000) << std::endl;
+    European_Option E2 = European_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
+    double E2_val = E2.binomial_lattice_price(10000);
+    output(E2.samples, "European_lattice");
 
-    // American_Option A = American_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
-    // std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
+    American_Option A = American_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
+    std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
 
-    // Asian_Option As = Asian_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
-    // std::cout << "Asian GRW price: " << As.fixed_strike_GRW_price(1000) << std::endl;
+    Asian_Option As = Asian_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
+    double As_val = As.fixed_strike_GRW_price(1000);
+    output(As.samples, "Asian_GRW");
 
-    // Barrier_Option B = Barrier_Option(type, strike, barrier, expiry_time, dt, s_0, r, r, sigma);    
-    // std::cout << "Knock-out option GRW price: " << B.GRW_price(1000) << std::endl;
+    Barrier_Option B = Barrier_Option(type, strike, barrier, expiry_time, dt, s_0, r, r, sigma);
+    double B_val = B.GRW_price(1000);
+    output(B.samples, "Barrier_GRW");
 
-    // Basket_Option Ba = Basket_Option(type, strike, weights, correlations, expiry_time, dt, s_0_B, r, mu, sigma_B);
-    // std::cout << "Basket GRW price: " << Ba.GRW_value(100) << std::endl;
+    Basket_Option Ba = Basket_Option(type, strike, weights, correlations, expiry_time, dt, s_0_B, r, mu, sigma_B);
+    double Ba_val = Ba.GRW_value(1000);
+    output(Ba.samples, "Basket_GRW");
 
-    // Exchange_Option E = Exchange_Option(s_0, s_0, 0.6, -0.05, -0.03, sigma, sigma, r, dt, 90/365.);
-    // std::cout << "Exchange GRW price: " << E.GRW_value(10000) << std::endl;
+    Exchange_Option E = Exchange_Option(s_0, s_0, 0.6, -0.05, -0.03, sigma, sigma, r, dt, 90/365.);
+    double E_val = E.GRW_value(10000);
+    output(E.samples, "Exchange_GRW");
 
-    // Bermudan_Option Be = Bermudan_Option(type, strike, exercise_dates, 90/365., 0.01/365., s_0, 0.06, 0.06, 0.4);
-    // std::cout << "Bermudan lattice price: " << Be.binomial_lattice_price() << std::endl;
+    Bermudan_Option Be = Bermudan_Option(type, strike, exercise_dates, 90/365., 0.01/365., s_0, 0.06, 0.06, 0.4);
+    std::cout << "Bermudan lattice price: " << Be.binomial_lattice_price() << std::endl;
 
     // KNOWN VALUES
     //
