@@ -684,18 +684,5 @@ int main(){
     Bermudan_Option Be = Bermudan_Option(type, strike, exercise_dates, 90/365., 0.01/365., s_0, 0.06, 0.06, 0.4);
     std::cout << "Bermudan lattice price: " << Be.binomial_lattice_price() << std::endl;
 
-    // KNOWN VALUES
-    //
-    //      OPTION      | VALUE | CORRECT? 
-    //=====================================
-    // European GRW     | 2.99  |     Y
-    // European Lattice | 0.421 |     Y
-    // American Lattice | 0.425 |     Y
-    // Asian GRW        | 1.75  |     Y
-    // Barrier GRW      | 2.57  |     Y
-    // Basket GRW       | 2.62  |     Y
-    // Exchange GRW     | 3.24  |     Y
-    // Bermudan Lattice | 7.23  |     Y
-
     return 0;
 }

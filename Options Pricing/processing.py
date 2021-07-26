@@ -41,11 +41,15 @@ def confidence_interval(samples, percentage, num_batches):
     max = theta + t_a*np.sqrt(s/num_batches)
     min = theta - t_a*np.sqrt(s/num_batches)
 
-    print(t_a)
-
     return min, max
 
-x = [45, 55, 67, 45, 68, 79, 98, 87, 84, 82]
-percentage = 0.999
-min, max = confidence_interval(x, percentage, len(x))
-print(f"With {percentage*100}% certainty, the value is in the interval ({min}, {max})")
+option_types = ["European_GRW", "European_lattice", "Asian_GRW", "Barrier_GRW", "Basket_GRW", "Exchange_GRW"]
+for n in option_types:
+    filename = "./Data/" + n + ".txt"
+    data = np.loadtxt(filename)
+
+    mean = sum(data)/len(data)
+    percentage = 0.95
+
+    min, max = confidence_interval(data, percentage, len(data))
+    print(f"Mean {n} value: {mean} \nWith {percentage*100}% certainty, the option value is in the interval ({min}, {max}). \n")
