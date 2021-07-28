@@ -43,7 +43,7 @@ def confidence_interval(samples, percentage, num_batches):
 
     return min, max
 
-option_types = ["European_GRW", "European_lattice", "Asian_GRW", "Barrier_GRW", "Basket_GRW", "Exchange_GRW"]
+option_types = ["European_GRW", "European_JD", "European_lattice", "Asian_GRW", "Barrier_GRW", "Basket_GRW", "Exchange_GRW"]
 for n in option_types:
     filename = "./Data/" + n + ".txt"
     data = np.loadtxt(filename)

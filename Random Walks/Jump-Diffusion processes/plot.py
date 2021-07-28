@@ -4,14 +4,21 @@ from scipy.stats import lognorm
 
 # configuring various figure elements
 fig, (ax1, ax2) = plt.subplots(1,2)
-#fig, ax2 = plt.subplots()
-fig.suptitle("Jump-Diffusion Processes")
+fig.suptitle("Jump-Diffusion Processes", fontsize = 50)
 
-ax1.set_title("1000 Paths")
-ax2.set_title("Distribution of Path Endpoints")
+ax1.set_title("1000 Paths", fontsize = 40)
+ax2.set_title("Distribution of Path Endpoints", fontsize = 40)
 
-ax1.set(xlabel = "Days", ylabel = "Value")
-ax2.set(xlabel = "End Value", ylabel = "Probability Density")
+ax1.set_xlabel("Days", fontsize = 30)
+ax1.set_ylabel("Value", fontsize = 30)
+ax2.set_xlabel("End Value", fontsize = 30)
+ax2.set_ylabel("Probability Density", fontsize = 30)
+
+ax1.tick_params(axis='x', labelsize=20)
+ax1.tick_params(axis='y', labelsize=20)
+ax2.tick_params(axis='x', labelsize=20)
+ax2.tick_params(axis='y', labelsize=20)
+
 
 # plot the first 1000 paths only
 for i in range(100000):
@@ -42,6 +49,6 @@ a = np.log(s_0)+mu*T-0.5*T*sig**2
 b = sig*np.sqrt(T)
 
 x = np.linspace(40,260, 100)
-ax2.plot(x, lognorm.pdf(x, b, scale = np.exp(a)), lw=2)
+ax2.plot(x, lognorm.pdf(x, b, scale = np.exp(a)), lw = 2)
 
 plt.show()
