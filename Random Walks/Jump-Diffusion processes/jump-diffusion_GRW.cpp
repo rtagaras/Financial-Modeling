@@ -93,7 +93,7 @@ struct J_D_GRW{
     std::pair<std::vector<double>, std::vector<double>> path(){
         
         std::pair<std::vector<double>, std::vector<double>> ret;
-        std::vector<double> data, time;
+        std::vector<double> data = {s_0}, time;
         std::vector<double> jump_times = arrival_times(T, lambda);
         int jump_count = 0;
         s = s_0;
@@ -141,9 +141,6 @@ struct J_D_GRW{
             }
         }
 
-        // Delete the last time step, since we don't use it
-        time.pop_back();
-
         ret = std::make_pair(data, time);
         return ret;
     }
@@ -166,8 +163,6 @@ int main(){
         p = values.first;
         t = values.second;
       
-        
-
         endpoints.push_back(p.back());
     }
 
