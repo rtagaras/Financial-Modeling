@@ -197,21 +197,127 @@ struct correlated_GRW{
     }
 };
 
+std::vector<double> arrival_times(double t, double lambda){
+    /*
+    Sample exponential distribution to give arrival times for Poisson jumps that occur before time t
+    */
+
+    double s = 0, sum = 0, dt, u;
+    std::vector<double> times;
+
+    while(s < t){
+        u = gen_uniform(0,1);
+        dt = -log(1-u)/lambda;
+        s += dt;
+
+        // it's possible that t_{n-1} < t but t_n > t, so we need to make sure that we don't add t_n to the vector if this is the case
+        if(s < t){
+            times.push_back(s);
+        }
+    }
+
+    return times;
+}
+
+struct J_D_GRW{
+    /*
+    Simulate a jump-diffusion process with drift mu, volatility sigma, and intensity lambda
+    T gives number of time units for which to calculate the path, dt is number of steps per unit time, s_0 is initial security price at day zero, dist_mu
+    and dist_sigma are the parameters for the (normal) distribution from which jump sizes are sampled
+    */
+
+    double mu, sigma, lambda, T, dt, s_0, s, dist_mu, dist_sigma;
+    int n;
+
+    J_D_GRW(double s_0_, double mu_, double sigma_, double T_, double dt_, double lambda_, double dist_mu_, double dist_sigma_){
+        s_0 = s_0_;
+        mu = mu_;
+        sigma = sigma_;
+        lambda = lambda_;
+        T = T_; 
+        dt = dt_;
+        dist_mu = dist_mu_;
+        dist_sigma = dist_sigma_;
+        n  = T/dt;
+    }
+
+    // calculate price as a function of time, measured in years
+    // returns a vector of prices and a vector of time steps
+    std::pair<std::vector<double>, std::vector<double>> path(){
+        
+        std::pair<std::vector<double>, std::vector<double>> ret;
+        std::vector<double> data, time;
+        std::vector<double> jump_times = arrival_times(T, lambda);
+        int jump_count = 0;
+        s = s_0;
+        double dt1, j, z, next_jump_time, t = 0;
+
+        // create a vector with all the time steps at which we want to calculate a value
+        // Most of these will be of the form m*dt, where m is a positive integer. The steps at which a jump occurs will be located off of this grid.
+        for(int k=0; k<n; k++){
+            time.push_back(k*dt);
+        }
+
+        for(int k=0; k<jump_times.size(); k++){
+            time.push_back(jump_times[k]);
+        }
+
+        std::sort(time.begin(), time.end());
+
+        for(int i=0; i<time.size()-1; i++){
+
+            if(jump_count < jump_times.size()){
+                next_jump_time = jump_times[jump_count];
+            }
+
+            dt1 = time[i+1]-time[i];            
+
+            // If a jump isn't coming next, do a standard geometric Brownian motion calculation.
+            if(time[i+1] < next_jump_time || jump_count > jump_times.size()){
+                z = gen_norm(0,1);
+                s = s*(1.0 + mu*dt1+sigma*z*sqrt(dt1));
+                data.push_back(s);
+            }
+
+            // Otherwise, calculate the jump.
+            else{
+                
+                // First, interpolate to the jump point using GBM
+                z = gen_norm(0,1);
+                s = s*(1.0 + mu*dt1+sigma*z*sqrt(dt1));
+                
+                // Calculate the jump at the jump point
+                j = gen_norm(dist_mu, dist_sigma*dist_sigma);
+                s = s*j;
+                data.push_back(s);
+                jump_count++;
+            }
+        }
+
+        // Delete the last time step, since we don't use it
+        time.pop_back();
+
+        ret = std::make_pair(data, time);
+        return ret;
+    }
+};
+
 class Option{
     /*
     Base class for a general option
 
-    s_0 is initial underlying value, r is risk-free rate (measured in percent/year), mu is drift, sigma is volatility, expiry time is measured in days
+    s_0 is initial underlying value, r is risk-free rate (measured in percent/year), mu is drift, sigma is volatility, expiry time is measured in years,
+    lambda is jump intensity, dist_mu and dist_sigma are the parameters for the (normal) distribution from which jump sizes are sampled
     samples holds the outcome of each trial, when needed
     */
     protected:
-    double strike, s_0, r, mu, sigma, dt, expiry_time;
+    double strike, s_0, r, mu, sigma, dt, expiry_time, lambda, dist_mu, dist_sigma;
     std::string type;
     
     public:
     std::vector<double> samples;
 
-    Option(std::string type_, double strike_, double expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_){
+    Option(std::string type_, double strike_, double expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_, double lambda_ = 0, double dist_mu_ = 0, double dist_sigma_ = 0){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
@@ -220,6 +326,9 @@ class Option{
         r = r_;
         mu = mu_;
         sigma = sigma_;
+        lambda = lambda_;
+        dist_mu = dist_mu_;
+        dist_sigma = dist_sigma_;
     }
 
     double payout(double x){
@@ -306,6 +415,28 @@ class European_Option : public Option{
         //return exp(-r*expiry_time)*x/n;
         return x/n;
     }
+
+    // use a jump-diffusion process to calcualte prices
+    double JD_price(int n){
+        double x = 0.0, s = 0.0;
+        std::pair<std::vector<double>, std::vector<double>> values;
+        std::vector<double> p;
+
+        // use Girsarnov theorem to make sure that the process is a martingale
+        mu = r-lambda*(dist_mu - 1);
+
+        J_D_GRW g = J_D_GRW(s_0, mu, sigma, expiry_time, dt, lambda, dist_mu, dist_sigma);
+        
+        for(int i=0; i<n; i++){
+            
+            p = g.path().first;
+            s = exp(-r*expiry_time)*payout(p.back());
+            x += s;
+            samples.push_back(s);
+        }
+
+        return x/n;
+    }
 };
 
 class American_Option : protected Option{
@@ -376,13 +507,39 @@ class Asian_Option : public Option{
             for(int j=0; j<p.size(); j++){
                 s += p[j]/p.size();
             }
+
             y = exp(-r*expiry_time)*payout(s);
-            //x += payout(s);
             x += y;
             samples.push_back(y);
         }
 
-        //return exp(-r*expiry_time)*x/n;
+        return x/n;
+    }
+
+    // use a jump-diffusion process to calcualte prices
+    double JD_price(int n){
+        double x = 0.0, s = 0.0, q = 0.0;
+        std::pair<std::vector<double>, std::vector<double>> values;
+        std::vector<double> p;
+
+        // use Girsarnov theorem to make sure that the process is a martingale
+        mu = r-lambda*(dist_mu - 1);
+
+        J_D_GRW g = J_D_GRW(s_0, mu, sigma, expiry_time, dt, lambda, dist_mu, dist_sigma);
+        
+        for(int i=0; i<n; i++){
+            
+            p = g.path().first;
+
+            for(int j=0; j<p.size(); j++){
+                q += p[j]/p.size();
+            }
+
+            s = exp(-r*expiry_time)*payout(q);
+            x += s;
+            samples.push_back(s);
+        }
+
         return x/n;
     }
 };
@@ -491,13 +648,11 @@ class Basket_Option{
                 
             p = g.path();   
             x = weights.dot(p.back());
-            // E += payout(x);
             s = exp(-r*expiry_time)*payout(x);
             E += s;
             samples.push_back(s);
         }
 
-        // return E*exp(-r*expiry_time)/n;
         return E/n;
     }
 };
@@ -544,12 +699,11 @@ class Exchange_Option {
                 B += B*(mu2*dt + sigma2*x*sqrt(dt)); 
             }
             
-            //E += payout(A-B);
             y = exp(-r*expiry_time)*payout(A-B);
             E += y;
             samples.push_back(y);
         }
-        //return E*exp(-r*expiry_time)/num_trials;
+
         return E/num_trials;
     }
     
@@ -633,6 +787,9 @@ int main(){
     double expiry_time = 60/365.;
     double dt = 1/365.;
     double barrier = 105;
+    double lambda = 0.1*365;
+    double dist_mu = 1.003;
+    double dist_sigma = 0.02;
 
     // Parameters for basket option
     Eigen::VectorXd weights(3);
@@ -654,35 +811,45 @@ int main(){
 
     std::vector<double> exercise_dates = {18, 36, 54, 72};
 
-    European_Option E1 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
-    double E1_val = E1.GRW_price(10000);
-    output(E1.samples, "European_GRW");
+    // European_Option E1 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
+    // double E1_val = E1.GRW_price(10000);
+    // output(E1.samples, "European_GRW");
 
-    European_Option E2 = European_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
-    double E2_val = E2.binomial_lattice_price(10000);
-    output(E2.samples, "European_lattice");
+    // European_Option E2 = European_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
+    // double E2_val = E2.binomial_lattice_price(10000);
+    // output(E2.samples, "European_lattice");
 
-    American_Option A = American_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
-    std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
+    // European_Option E3 = European_Option(type, strike, expiry_time, dt, s_0, r, r, sigma, lambda, dist_mu, dist_sigma);
+    // double E3_val = E3.JD_price(1000);
+    // output(E3.samples, "European_JD");
 
-    Asian_Option As = Asian_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
-    double As_val = As.fixed_strike_GRW_price(1000);
-    output(As.samples, "Asian_GRW");
+    // American_Option A = American_Option(type, 49, 4/365., dt, 50, 0.26, 0.26, 0.4);
+    // std::cout << "American lattice price: " << A.binomial_lattice_price() << std::endl;
 
-    Barrier_Option B = Barrier_Option(type, strike, barrier, expiry_time, dt, s_0, r, r, sigma);
-    double B_val = B.GRW_price(1000);
-    output(B.samples, "Barrier_GRW");
+    // Asian_Option As1 = Asian_Option(type, strike, expiry_time, dt, s_0, r, r, sigma);
+    // double As1_val = As1.fixed_strike_GRW_price(1000);
+    // output(As1.samples, "Asian_GRW");
 
-    Basket_Option Ba = Basket_Option(type, strike, weights, correlations, expiry_time, dt, s_0_B, r, mu, sigma_B);
-    double Ba_val = Ba.GRW_value(1000);
-    output(Ba.samples, "Basket_GRW");
+    // Asian_Option As2 = Asian_Option(type, strike, expiry_time, dt, s_0, r, r, sigma, lambda, dist_mu, dist_sigma);
+    // double As2_val = As2.JD_price(1000);
+    // output(As2.samples, "Asian_JD");
 
-    Exchange_Option E = Exchange_Option(s_0, s_0, 0.6, -0.05, -0.03, sigma, sigma, r, dt, 90/365.);
-    double E_val = E.GRW_value(10000);
-    output(E.samples, "Exchange_GRW");
+    // Barrier_Option B = Barrier_Option(type, strike, barrier, expiry_time, dt, s_0, r, r, sigma);
+    // double B_val = B.GRW_price(1000);
+    // output(B.samples, "Barrier_GRW");
 
-    Bermudan_Option Be = Bermudan_Option(type, strike, exercise_dates, 90/365., 0.01/365., s_0, 0.06, 0.06, 0.4);
-    std::cout << "Bermudan lattice price: " << Be.binomial_lattice_price() << std::endl;
+    // Basket_Option Ba = Basket_Option(type, strike, weights, correlations, expiry_time, dt, s_0_B, r, mu, sigma_B);
+    // double Ba_val = Ba.GRW_value(1000);
+    // output(Ba.samples, "Basket_GRW");
+
+    // Exchange_Option E = Exchange_Option(s_0, s_0, 0.6, -0.05, -0.03, sigma, sigma, r, dt, 90/365.);
+    // double E_val = E.GRW_value(10000);
+    // output(E.samples, "Exchange_GRW");
+
+    // Bermudan_Option Be = Bermudan_Option(type, strike, exercise_dates, 90/365., 0.01/365., s_0, 0.06, 0.06, 0.4);
+    // std::cout << "Bermudan lattice price: " << Be.binomial_lattice_price() << std::endl;
+
+    
 
     return 0;
 }
