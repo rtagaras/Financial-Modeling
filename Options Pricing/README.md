@@ -3,9 +3,9 @@
 This project demonstrates methods for pricing a variety of options. 
 options_pricing.cpp calculates values for the following option types:
 
-- European options (binomial lattice, geometric Brownian motion)
+- European options (binomial lattice, geometric Brownian motion, jump-diffusion process)
 - American options (binomial lattice)
-- Fixed strike Asian options (geometric Brownian motion)
+- Fixed strike Asian options (geometric Brownian motion, jump-diffusion process)
 - Barrier Options (geometric Brownian motion)
 - Basket Options (geometric Brownian motion)
 - Exchange Options (geometric Brownian motion)
