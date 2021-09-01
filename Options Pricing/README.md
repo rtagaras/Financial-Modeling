@@ -12,3 +12,5 @@ options_pricing.cpp calculates values for the following option types:
 - Bermudan Options (binomial lattice)
 
 processing.py calculates confidence intervals for the option values computed by options_pricing.cpp
+
+american_boundary.cpp prices an American option using simulated annealing to find an optimal exercise boundary. 
