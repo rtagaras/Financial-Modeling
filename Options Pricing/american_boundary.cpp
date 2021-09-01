@@ -66,8 +66,32 @@ class American_Option{
     }
 
     // Finds the optimal values of {a1, a2, b1, b2, c1, c2} so that the option price is maximized
-    void optimize_exercise_boundary(){
+    std::pair<std::vector<double>, double> optimize_exercise_boundary(double a, double b, std::vector<double> x, double epsilon, int m, double T_max){
+        
+        std::vector<double> y;
+        double E = 1./GRW_price(x, 1);
+        double E_trial = 0;
+        double delta_E = 0;
+        double z = 0;
+        double T = T_max;
 
+        for(int i=0; i<m; i++){
+            // create a random 6d vector with length less than epsilon. The vector components give the parameters for the current trial.
+            y = generate_vector(epsilon);
+            E_trial = 1./GRW_price(y,1);
+            delta_E = E_trial - E;
+
+            // with probability e^{-Delta_E/T}, update the choice of vector
+            z = gen_uniform(0,1);
+            if(z <= exp(-delta_E/T)){
+                x = y;
+                E = E_trial;
+            }
+
+            T = a*std::pow(b,i);
+        }
+
+        return std::make_pair(x,1./GRW_price(x,1));
     }
 
     double GRW_price(int m){
