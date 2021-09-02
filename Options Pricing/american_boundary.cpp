@@ -5,6 +5,7 @@
 #include <vector>
 #include <fstream>
 #include <Eigen/Dense>
+#include <math.h>
 
 std::random_device rd;
 std::mt19937 gen(rd());
@@ -16,6 +17,15 @@ double gen_norm(double mean, double variance){
     return d(gen);
 }
 
+double gen_uniform(double min, double max){
+    /*
+    sample a uniform distribution
+    */
+
+    std::uniform_real_distribution<double> d(min, max);
+    return d(gen);
+}
+
 double boundary(double t, double a1, double a2, double b1, double b2, double c1, double c2){
     /*
     A particular choice of exercise boundary parameterization. t gives the time to expiry. The a,b,c constants will be determined by some optimization
@@ -24,17 +34,41 @@ double boundary(double t, double a1, double a2, double b1, double b2, double c1,
     return a1*std::log(b1*std::pow(t,c1) + 1.) + a2*std::log(b2*std::pow(t,c2) + 1.);
 }
 
+std::vector<double> generate_vector(double epsilon){
+    /*
+    Gives the cartesian components of a random 6-dimensional vector with magnitude less than epsilon
+    */
+
+    double r = gen_uniform(0, epsilon);
+    double theta_1 = gen_uniform(0, M_PI);
+    double theta_2 = gen_uniform(0, M_PI);
+    double theta_3 = gen_uniform(0, M_PI);
+    double theta_4 = gen_uniform(0, M_PI);
+    double theta_5 = gen_uniform(0, 2.*M_PI);
+
+    double x1 = r*cos(theta_1);
+    double x2 = r*sin(theta_1)*cos(theta_2);
+    double x3 = r*sin(theta_1)*sin(theta_2)*cos(theta_3);
+    double x4 = r*sin(theta_1)*sin(theta_2)*sin(theta_3)*cos(theta_4);
+    double x5 = r*sin(theta_1)*sin(theta_2)*sin(theta_3)*sin(theta_4)*cos(theta_5);
+    double x6 = r*sin(theta_1)*sin(theta_2)*sin(theta_3)*sin(theta_4)*sin(theta_5);
+
+    std::vector<double> v = {x1,x2,x3,x4,x5,x6};
+
+    return v;
+}
+
 class American_Option{
     
     private:
-    double strike, s_0, r, mu, sigma, dt, expiry_time, lambda, dist_mu, dist_sigma, a1, a2, b1, b2, c1, c2;
+    double strike, s_0, r, mu, sigma, dt, expiry_time;
     int n;
     std::string type;
     
     public:
     std::vector<double> samples;
 
-    American_Option(std::string type_, double strike_, double expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_, double lambda_ = 0, double dist_mu_ = 0, double dist_sigma_ = 0){
+    American_Option(std::string type_, double strike_, double expiry_time_, double dt_, double s_0_, double r_, double mu_, double sigma_){
         type = type_;
         strike = strike_;
         expiry_time = expiry_time_;
@@ -43,9 +77,6 @@ class American_Option{
         r = r_;
         mu = mu_;
         sigma = sigma_;
-        lambda = lambda_;
-        dist_mu = dist_mu_;
-        dist_sigma = dist_sigma_;
         n = expiry_time/dt;
     }
 
@@ -94,8 +125,9 @@ class American_Option{
         return std::make_pair(x,1./GRW_price(x,1));
     }
 
-    double GRW_price(int m){
+    double GRW_price(std::vector<double> parameters, int m){
         double sum = 0;
+        double a1 = parameters[0], a2 = parameters[1], b1 = parameters[2], b2 = parameters[3], c1 = parameters[4], c2 = parameters[5];
 
         for(int i=0; i<m; i++){
             double z;
@@ -117,6 +149,21 @@ class American_Option{
 };
 
 int main(){
+    std::string type = "put";
+    double strike = 100;
+    double expiry_time = 60/365.;
+    double dt = 1/365.;
+    double s_0 = 100;
+    double r = 0.03;
+    double mu = 0.03;
+    double sigma = 0.2;
+    double epsilon = 0.1;
+    double a = 0.1;
+    double b = 0.999999999;
+    std::vector<double> x = {0.1, 0.1, 0.1, 0.1, 0.1, 0.1};
+    double T_max = 50;
 
+    American_Option O = American_Option(type, strike, expiry_time, dt, s_0, r, mu, sigma);
+    std::pair<std::vector<double>, double> data = O.optimize_exercise_boundary(a, b, x, epsilon, 1000, T_max);
 
 }
