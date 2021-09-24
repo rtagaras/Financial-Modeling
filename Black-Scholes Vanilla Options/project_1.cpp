@@ -88,7 +88,7 @@ class Option{
         return 0;
     }
 
-    double MC_SDE_price(double z){
+    double MC_SDE_underlying_price(double z){
         /*
         Return the end value of a lognormally distributed path, as determined by solving the SDE. 
         z should be a N(0,1) distributed random variable, as calculated by the RNG class
@@ -105,7 +105,7 @@ class Option{
         int n = rand_vals.size();
 
         for(int i=0; i<n; i++){
-            price = MC_SDE_price(rand_vals[i]);
+            price = MC_SDE_underlying_price(rand_vals[i]);
             sum += payout(price);
         }
 
@@ -546,8 +546,6 @@ int main(){
     output(call_prices, "call_volatility");
     output(DC_prices, "DC_volatility");
 
-
-    // There's an issue here. My results are really big and jump around a lot. I'll need to look into it.
 
     // Investigation 3
     sigma=0.01;
