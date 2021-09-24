@@ -217,7 +217,7 @@ int main(){
     double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01;
     Call C = Call(S, K, r, d, T, sigma);
 
-    // Check to see that the Black-Scholes Greeks and the finite difference Greeks agree
+    // Check to see that the Black-Scholes Greeks and the finite difference Greeks agree 
     // I can't get Rho and Theta to differ by more than 0.03. I'll need to fix this. 
     std::cout << "Delta: " << C.BS_Delta(S, K, r, d, T, sigma) - C.FD_Delta(S, K, r, d, T, sigma, epsilon) << std::endl <<
                  "Gamma: " << C.BS_Gamma(S, K, r, d, T, sigma) - C.FD_Gamma(S, K, r, d, T, sigma, epsilon) << std::endl <<
