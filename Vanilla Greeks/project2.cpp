@@ -217,12 +217,92 @@ int main(){
     double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01;
     Call C = Call(S, K, r, d, T, sigma);
 
-    // Check to see that the Black-Scholes Greeks and the finite difference Greeks agree 
-    // I can't get Rho and Theta to differ by more than 0.03. I'll need to fix this. 
+    // Check to see that the Black-Scholes Greeks and the finite difference Greeks agree
     std::cout << "Delta: " << C.BS_Delta(S, K, r, d, T, sigma) - C.FD_Delta(S, K, r, d, T, sigma, epsilon) << std::endl <<
                  "Gamma: " << C.BS_Gamma(S, K, r, d, T, sigma) - C.FD_Gamma(S, K, r, d, T, sigma, epsilon) << std::endl <<
                  "Kappa: " << C.BS_Kappa(S, K, r, d, T, sigma) - C.FD_Kappa(S, K, r, d, T, sigma, epsilon) << std::endl <<
                  "Rho: " << C.BS_Rho(S, K, r, d, T, sigma) - C.FD_Rho(S, K, r, d, T, sigma, epsilon) << std::endl << 
                  "Theta: " << C.BS_Theta(S, K, r, d, T, sigma) - C.FD_Theta(S, K, r, d, T, sigma, epsilon) << std::endl;
 
+    //==================================================================================================================================================
+    //          Plotting
+    //==================================================================================================================================================
+
+    // Plot as a function of spot price
+    int n = 1000;
+    double S_max = 100, dS=S_max/n, Delta, Gamma, Kappa;
+    std::vector<double> Delta_vals_spot, Gamma_vals_spot, Kappa_vals_spot, S_vals;
+    S = 0;
+
+    for(int i=0; i<n; i++){
+        Delta = C.BS_Delta(S, K, r, d, T, sigma);
+        Gamma = C.BS_Gamma(S, K, r, d, T, sigma);
+        Kappa = C.BS_Kappa(S, K, r, d, T, sigma);
+        
+        Delta_vals_spot.push_back(Delta);
+        Gamma_vals_spot.push_back(Gamma);
+        Kappa_vals_spot.push_back(Kappa);
+
+        S_vals.push_back(S);
+
+        S += dS;
+    }
+
+    output(Delta_vals_spot, "Delta_spot");
+    output(Gamma_vals_spot, "Gamma_spot");
+    output(Kappa_vals_spot, "Kappa_spot");
+    output(S_vals, "S");
+
+    // Plot as a function of time
+    double t=0, Expiry_time=T, dt=Expiry_time/n;
+    std::vector<double> Delta_OTM_vals, Delta_ATM_vals, Delta_ITM_vals, Kappa_vals_time, t_vals;
+
+    for(int i=0; i<n; i++){
+        
+        // ITM Delta
+        S = 100;
+        Delta = C.BS_Delta(S, K, r, d, T, sigma);
+        Delta_ITM_vals.push_back(Delta);
+
+        // ATM Delta
+        S = 90;
+        Delta = C.BS_Delta(S, K, r, d, T, sigma);
+        Delta_ATM_vals.push_back(Delta);
+
+        // OTM Delta
+        S = 80;
+        Delta = C.BS_Delta(S, K, r, d, T, sigma);
+        Delta_OTM_vals.push_back(Delta);
+
+        // Kappa
+        Kappa = C.BS_Kappa(S, K, r, d, T, sigma);
+        Kappa_vals_time.push_back(Kappa);
+
+        t_vals.push_back(t*365);
+
+        t += dt;
+        T = Expiry_time - t;
+    }
+
+    output(Delta_ITM_vals, "Delta_ITM");
+    output(Delta_ATM_vals, "Delta_ATM");
+    output(Delta_OTM_vals, "Delta_OTM");
+    output(Kappa_vals_time, "Kappa_time");
+    output(t_vals, "t");
+
+    // Plot as a function of volatility
+    double sigma_max=1, d_sig=sigma_max/n;
+    std::vector<double> Kappa_vals_volatility, sigma_vals;
+    T=60/365., S=100, sigma=0;
+
+    for(int i=0; i<n; i++){
+        Kappa = C.BS_Kappa(S, K, r, d, T, sigma);
+        Kappa_vals_volatility.push_back(Kappa);
+
+        sigma_vals.push_back(sigma);
+        sigma += d_sig;
+    }
+
+    output(Kappa_vals_volatility, "Kappa_vol");
+    output(sigma_vals, "sigma");
 }
