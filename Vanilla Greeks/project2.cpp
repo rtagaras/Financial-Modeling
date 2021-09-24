@@ -195,23 +195,34 @@ class Call : public Option{
         return (BS_price(S+epsilon, K, r, d, T, sigma)-BS_price(S, K, r, d, T, sigma))/epsilon;
     }
 
-    double FD_Gamma(double epsilon){
-        return (BS_price(S+epsilon, K, r, d, T, sigma) - 2*BS_price(S, K, r, d, T, sigma) + BS_price(S-epsilon, K, r, d, T, sigma))/(epsilon*epsilon);
+    double FD_Gamma(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
+        return (BS_price(S_+epsilon, K_, r_, d_, T_, sigma_) - 2*BS_price(S_, K_, r_, d_, T_, sigma) + BS_price(S_-epsilon, K_, r_, d_, T_, sigma_))/(epsilon*epsilon);
     }
 
-    double FD_Kappa(double epsilon){
-        return (BS_price(S, K, r, d, T, sigma+epsilon)-BS_price(S, K, r, d, T, sigma))/epsilon;
+    double FD_Kappa(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
+        return (BS_price(S_, K_, r_, d_, T_, sigma_+epsilon)-BS_price(S_, K_, r_, d_, T_, sigma_))/epsilon;
     }
 
-    double FD_Rho(double epsilon){
-        return (BS_price(S, K, r+epsilon, d, T, sigma)-BS_price(S, K, r, d, T, sigma))/epsilon;
+    double FD_Rho(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
+        return (BS_price(S_, K_, r_+epsilon, d_, T_, sigma_)-BS_price(S_, K_, r_, d_, T_, sigma_))/epsilon;
     }
 
-    double FD_Theta(double epsilon){
-        return -(BS_price(S, K, r, d, T+epsilon, sigma)-BS_price(S, K, r, d, T, sigma))/epsilon;
+    double FD_Theta(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
+        return -(BS_price(S_, K_, r_, d_, T_+epsilon, sigma_)-BS_price(S_, K_, r_, d_, T_, sigma_))/epsilon;
     }
 };
 
 int main(){
+
+    double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01;
+    Call C = Call(S, K, r, d, T, sigma);
+
+    // Check to see that the Black-Scholes Greeks and the finite difference Greeks agree
+    // I can't get Rho and Theta to differ by more than 0.03. I'll need to fix this. 
+    std::cout << "Delta: " << C.BS_Delta(S, K, r, d, T, sigma) - C.FD_Delta(S, K, r, d, T, sigma, epsilon) << std::endl <<
+                 "Gamma: " << C.BS_Gamma(S, K, r, d, T, sigma) - C.FD_Gamma(S, K, r, d, T, sigma, epsilon) << std::endl <<
+                 "Kappa: " << C.BS_Kappa(S, K, r, d, T, sigma) - C.FD_Kappa(S, K, r, d, T, sigma, epsilon) << std::endl <<
+                 "Rho: " << C.BS_Rho(S, K, r, d, T, sigma) - C.FD_Rho(S, K, r, d, T, sigma, epsilon) << std::endl << 
+                 "Theta: " << C.BS_Theta(S, K, r, d, T, sigma) - C.FD_Theta(S, K, r, d, T, sigma, epsilon) << std::endl;
 
 }
