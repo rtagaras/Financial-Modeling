@@ -146,7 +146,6 @@ class Option{
     double std_error(double std_dev, double n){
         return std_dev/sqrt(n);
     }
-
 };
 
 class Call : public Option{
@@ -157,6 +156,21 @@ class Call : public Option{
     double payout(double s){
         return std::max(s-K, 0.0);
     }
+
+    double d_payout_ds(double s){
+        if(S >= K){
+            return 1;
+        }
+
+        else{
+            return 0;
+        }
+    }
+
+    //==================================================================================================================================================
+    //          Properties derived from the Black-Scholes equation
+    //==================================================================================================================================================
+
 
     double BS_price(double S_, double K_, double r_, double d_, double T_, double sigma_){     
         double D1 = d1(S_, K_, r_, d_, T_, sigma_);
@@ -191,6 +205,11 @@ class Call : public Option{
         return S*exp(-d*T)*d*N(D1) - K*exp(-r*T)*r*N(D2) - S*exp(-r*T)*sigma*N_prime(D1)/(2*sqrt(T));
     }
 
+    //==================================================================================================================================================
+    //          Properties obtained by using finite differences
+    //==================================================================================================================================================
+
+
     double FD_Delta(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
         return (BS_price(S+epsilon, K, r, d, T, sigma)-BS_price(S, K, r, d, T, sigma))/epsilon;
     }
@@ -209,6 +228,51 @@ class Call : public Option{
 
     double FD_Theta(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon){
         return -(BS_price(S_, K_, r_, d_, T_+epsilon, sigma_)-BS_price(S_, K_, r_, d_, T_, sigma_))/epsilon;
+    }
+
+    //==================================================================================================================================================
+    //          Properties obtained by using Monte Carlo
+    //==================================================================================================================================================
+
+    double MC_price(double S_, double K_, double r_, double d_, double T_, double sigma_, std::vector<double> rand_vals){
+        /*
+        Return the price of a call using the SDE price as calculated above. 
+        rand_vals should contain a number of N(0,1) random variables equal to the number of trials that we want to perform. 
+        */
+        double sum = 0, price = 0;
+        int n = rand_vals.size();
+        double z;
+
+        for(int i=0; i<n; i++){
+            z = rand_vals[i];
+            price = S_*exp((r_-d_)*T_-0.5*sigma_*sigma_*T_+sigma_*z*sqrt(T_));
+            sum += payout(price);
+        }
+
+        return exp(-r_*T_)*sum/n;
+    }
+
+    double MC_Delta(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon, std::vector<double> rand_vals_1, std::vector<double> rand_vals_2){
+        double price_1 = MC_price(S_ + epsilon, K_, r_, d_, T_, sigma_, rand_vals_1);
+        double price_2 = MC_price(S_, K_, r_, d_, T_, sigma_, rand_vals_2);
+
+        return (price_1-price_2)/epsilon;
+    }
+
+    double MC_Delta_2(double S_, double K_, double r_, double d_, double T_, double sigma_, double epsilon, std::vector<double> rand_vals){
+        double price_1 = MC_price(S_ + epsilon, K_, r_, d_, T_, sigma_, rand_vals);
+        double price_2 = MC_price(S_, K_, r_, d_, T_, sigma_, rand_vals);
+
+        return (price_1-price_2)/epsilon;
+    }
+
+    double dlog_phi(double x, double S_0_, double r_, double d_, double T_, double sigma_){
+        /*
+        Derivative of the logarithm of the Black-Scholes distribution with respect to S.
+        This is used in the likelihood and pathwise methods.
+        */
+        
+        return -(1.0 + (log(x/S_0_)-T_*(r_ - d_ - 0.5*sigma_*sigma_))/(T_*sigma_*sigma_))/x;
     }
 };
 
@@ -305,4 +369,65 @@ int main(){
 
     output(Kappa_vals_volatility, "Kappa_vol");
     output(sigma_vals, "sigma");
+
+    //==================================================================================================================================================
+    //          Monte Carlo Greeks
+    //==================================================================================================================================================
+
+    // First, calculate Delta using Monte Carlo for finite differences
+    RNG R = RNG();
+    int m = 20;
+    sigma = 0.3;
+
+    std::vector<double> rand_vals_1, rand_vals_2, Delta_1_vals, Delta_2_vals;
+    double Delta_1, Delta_2;
+
+    for(int i=0; i<m; i++){
+        n = std::pow(2,i);
+        
+        for(int j=0; j<n; j++){
+            rand_vals_1.push_back(R.gen_norm(0,1));
+            rand_vals_2.push_back(R.gen_norm(0,1));
+        }
+
+        // Different RNG
+        Delta_1 = C.MC_Delta(S, K, r, d, T, sigma, epsilon, rand_vals_1, rand_vals_2);
+        
+        // Same RNG
+        Delta_2 = C.MC_Delta_2(S, K, r, d, T, sigma, epsilon, rand_vals_1);
+
+        Delta_1_vals.push_back(Delta_1);
+        Delta_2_vals.push_back(Delta_2);
+    }
+
+    output(Delta_1_vals, "Delta_1_vals");
+    output(Delta_2_vals, "Delta_2_vals");
+
+    // Next, the likelihood ratio and pathwise methods
+    double  u, sum1=0, sum2=0, z, S_T;
+
+    std::vector<double> likelihood_vals, pathwise_vals;
+
+    for(int i=0; i<m; i++){
+        n = std::pow(2,i);
+        sum1 = 0;
+        sum2 = 0;
+
+        std::cout << "i: " << i << std::endl;
+
+        for(int j=0; j<n; j++){
+            z = R.gen_norm(0,1);
+            S_T = C.MC_SDE_underlying_price(z);
+            sum1 += exp(-r*T)*C.payout(C.MC_SDE_underlying_price(z))*z/(S*sigma*sqrt(T))/n;
+            sum2 += exp(-r*T)*S_T*C.d_payout_ds(S_T)/(S*n);
+        }
+
+        likelihood_vals.push_back(sum1);
+        pathwise_vals.push_back(sum2);
+    }
+
+    output(likelihood_vals, "likelihood_vals");
+    output(pathwise_vals, "pathwise_vals");
+
+    std::cout<< "Black-Scholes value is: " << C.BS_Delta(S, K, r, d, T, sigma) << std::endl;
 }
