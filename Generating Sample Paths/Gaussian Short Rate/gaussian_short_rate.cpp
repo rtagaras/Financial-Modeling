@@ -4,6 +4,23 @@
 #include <fstream>
 #include <sstream>
 
+template<class T>
+void output(std::vector<T> v, std::string filename){
+    /*
+    write a vector to a .txt file and store it in the Data subdirectory 
+    */
+
+    std::ofstream ofs;
+    ofs.open("./Data/" + filename + ".txt");
+    
+    for(int i=0; i<v.size(); i++){
+        ofs << v[i] << '\n';
+    }
+    
+    ofs.close();
+}
+
+
 std::vector<std::pair<std::string, std::vector<double>>> read_csv(std::string filename){
     // Reads a CSV file into a vector of <string, vector<double>> pairs where
     // each pair represents <column name, column values>
@@ -150,11 +167,11 @@ class Ho_Lee_Model : RNG{
 
 int main(){
 
-    Ho_Lee_Model H = Ho_Lee_Model(1,1,1,1);
-    //int v = H.get_rate_curve_value(0);
+    Ho_Lee_Model H = Ho_Lee_Model(1.0,0.2,60/365.,1/365.);
+    std::vector<double> v = H.path();
+    output(v, "HL_data");
 
-    std::vector<std::pair<std::string, std::vector<double>>> data = read_csv("FED-SVENF-2.csv");
-    //std::vector<std::pair<std::string, std::vector<double>>> data = read_csv("test.csv");
-
-    std::cout << data[0].second[1] << std::endl;
+    // Vasicek_model V = Vasicek_model(1.0,0.2,60/365.,1/365.);
+    // v = V.path();
+    // output(v, "V_data");
 }
