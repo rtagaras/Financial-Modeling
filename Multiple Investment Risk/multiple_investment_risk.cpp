@@ -72,7 +72,6 @@ struct GRW{
     }
 };
 
-
 struct Correlation_Matrix{
 
     /*
@@ -231,7 +230,6 @@ struct market_scenario{
     }
 };
 
-//std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, market_scenario m){
 std::vector<Eigen::VectorXd> market_correlated_samples(Eigen::MatrixXd M, std::vector<double> increments){
 
     /*
