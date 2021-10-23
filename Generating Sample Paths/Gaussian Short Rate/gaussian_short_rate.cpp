@@ -138,12 +138,6 @@ class Ho_Lee_Model : RNG{
         n  = T_max/dt;
         data = read_csv("FED-SVENF-2.csv");
         f_last = data[0].second[0];
-        //data = read_csv("test.csv");
-    }
-
-    // get the mth value from the 1-year instantaenous forward rate
-    double get_rate_curve_value(int m){    
-        return data[0].second[m];
     }
 
     // calculate price as a function of time, measured in years
@@ -153,6 +147,7 @@ class Ho_Lee_Model : RNG{
         
         for(int i=1; i<n; i++){
 
+            // Get value from the instantaneous rate curve
             f = data[0].second[i];
 
             z = gen_norm(0,1);
@@ -163,15 +158,95 @@ class Ho_Lee_Model : RNG{
 
         return vals;
     }
+
+    // return the average of m trials of the bond price at T_max
+    double bond_price(int m){
+        double sum = 0, avg = 0;
+        std::vector<double> p;
+
+        for(int i=0; i<m; i++){
+            // Get a new path for each trial
+            p = path();
+
+            // Integrate r(t)
+            for(int j=0; j<p.size(); j++){
+                sum += p[j];
+            }
+            sum = sum*dt;
+
+            // Add trial result to average
+            avg += exp(-sum);
+        }
+
+        return avg/m;
+    }
+};
+
+class Vasicek_Model : public RNG{
+    /*
+    Model bond prices using the Vasicek model. sigma gives the volatility, b is the (constant) level to which the mean reverts, and a can be thought of 
+    as the speed of the reversion.
+
+    T_max gives number of time units for which to calculate the path, dt is number of steps per unit time
+    r_0 is initial interest rate at day zero
+    */
+
+    public:
+    double a, b, sigma, T_max, dt, r, r_0, z;
+    int n;
+
+    Vasicek_Model(double r_0_, double a_, double b_, double sigma_, double T_max_, double dt_): r_0(r_0_), a(a_), b(b_), sigma(sigma_), T_max(T_max_), dt(dt_){
+        n = T_max/dt;
+    } 
+
+    // calculate price as a function of time, measured in years
+    std::vector<double> path(){
+        std::vector<double> vals;
+        r = r_0;
+        
+        for(int i=0; i<n; i++){
+
+            z = gen_norm(0,1);
+            r = exp(-a*dt)*r + b*(1-exp(-a*dt))+sigma*z*sqrt((1-exp(-2*a*dt))/(2*a));
+            vals.push_back(r);
+        }
+
+        return vals;
+    }
+
+    // return the average of m trials of the bond price at T_max
+    double bond_price(int m){
+        double sum = 0, avg = 0;
+        std::vector<double> p;
+
+        for(int i=0; i<m; i++){
+            // Get a new path for each trial
+            p = path();
+
+            // Integrate r(t)
+            for(int j=0; j<p.size(); j++){
+                sum += p[j];
+            }
+            sum = sum*dt;
+
+            // Add trial result to average
+            avg += exp(-sum);
+        }
+
+        return avg/m;
+    }
+
 };
 
 int main(){
 
-    Ho_Lee_Model H = Ho_Lee_Model(1.0,0.2,60/365.,1/365.);
+    Ho_Lee_Model H = Ho_Lee_Model(1.0, 0.2, 60/365., 1/365.);
     std::vector<double> v = H.path();
     output(v, "HL_data");
+    std::cout << "HL bond price = " << H.bond_price(1000) << std::endl;
 
-    // Vasicek_model V = Vasicek_model(1.0,0.2,60/365.,1/365.);
-    // v = V.path();
-    // output(v, "V_data");
+    Vasicek_Model V = Vasicek_Model(1.0, 100.0, 1.0, 0.2, 60/365., 1/365.);
+    v = V.path();
+    output(v, "V_data");
+    std::cout << "Vasicek bond price = " << H.bond_price(1000) << std::endl;
 }
