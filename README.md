@@ -2,8 +2,8 @@
 
 This is a series of projects of varying size, meant to document my study of the applications of computational methods to finance.
 
-Individual ideas are contained within their own folders; names should be self-descriptive. 
+Individual ideas are contained within their own folders; names are hopefully self-descriptive. 
 
-"Multiple Investment Risk", "Options Pricing", and "Random Walks" follow "Finance with Monte Carlo" by Ronald Shonkwiler.
+"Multiple Investment Risk" and "Options Pricing" follow "Finance with Monte Carlo" by Ronald Shonkwiler.
 
-"Black-Scholes Vanilla Options" and "Vanilla Greeks" follow "The Concepts and Practice of Mathematical Finance" by Mark Joshi.
+"Black-Scholes Vanilla Options", "Vanilla Greeks", and "Delta and Gamma Hedging" follow "The Concepts and Practice of Mathematical Finance" by Mark Joshi.
