@@ -20,3 +20,9 @@ test.cpp
 # Ignore short rate datasets
 FED*
 Delta and Gamma Hedging/.vscode/settings.json
+Delta and Gamma Hedging/SQLite_test.db
+Delta and Gamma Hedging/SQLite_test.sql
+Delta and Gamma Hedging/SQLite_test.txt
+Delta and Gamma Hedging/test.db
+.gitignore
+Delta and Gamma Hedging/chinook.db
