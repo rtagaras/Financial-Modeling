@@ -26,3 +26,4 @@ Delta and Gamma Hedging/SQLite_test.txt
 Delta and Gamma Hedging/test.db
 .gitignore
 Delta and Gamma Hedging/chinook.db
+Options Pricing/annealing_practice.cpp
