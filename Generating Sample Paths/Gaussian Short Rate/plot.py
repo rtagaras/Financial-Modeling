@@ -1,6 +1,5 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.stats import lognorm
 
 # configuring various figure elements
 fig, (ax1, ax2) = plt.subplots(1,2)
