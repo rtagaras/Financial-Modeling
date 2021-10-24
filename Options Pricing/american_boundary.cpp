@@ -42,20 +42,27 @@ std::vector<double> generate_vector(std::vector<double> x, double epsilon){
     case of a negative value. 
     */
 
-    double r = gen_uniform(0, epsilon) + sqrt(x[0]*x[0] + x[1]*x[1] + x[2]*x[2] + x[3]*x[3] + x[4]*x[4] + x[5]*x[5]);
-    double theta_1 = gen_uniform(0, M_PI);
-    double theta_2 = gen_uniform(0, M_PI);
-    double theta_3 = gen_uniform(0, M_PI);
-    double theta_4 = gen_uniform(0, M_PI);
-    double theta_5 = gen_uniform(0, 2.*M_PI);
+    // Generate 6 normally distributed coordinates
+    double c1 = gen_norm(0,1);
+    double c2 = gen_norm(0,1);
+    double c3 = gen_norm(0,1);
+    double c4 = gen_norm(0,1);
+    double c5 = gen_norm(0,1);
+    double c6 = gen_norm(0,1);
 
-    // convert from spherical coordinates to cartesian
-    double x1 = abs(r*cos(theta_1));
-    double x2 = abs(r*sin(theta_1)*cos(theta_2));
-    double x3 = abs(r*sin(theta_1)*sin(theta_2)*cos(theta_3));
-    double x4 = abs(r*sin(theta_1)*sin(theta_2)*sin(theta_3)*cos(theta_4));
-    double x5 = abs(r*sin(theta_1)*sin(theta_2)*sin(theta_3)*sin(theta_4)*cos(theta_5));
-    double x6 = abs(r*sin(theta_1)*sin(theta_2)*sin(theta_3)*sin(theta_4)*sin(theta_5));
+    // Find the norm
+    double d = sqrt(c1*c1 + c2*c2 + c3*c3 + c4*c4 + c5*c5 + c6*c6);
+    
+    // Generate the radius of the ball to sample
+    double r = std::pow(gen_uniform(0,std::pow(epsilon,6)),1/6);
+
+    // convert from old coordinates to cartesian and add the original point's coordinates to the new ones so that we get the right offset
+    double x1 = r*c1/d + x[0];
+    double x2 = r*c2/d + x[1];
+    double x3 = r*c3/d + x[2];
+    double x4 = r*c4/d + x[3];
+    double x5 = r*c5/d + x[4];
+    double x6 = r*c6/d + x[5];
 
     std::vector<double> v = {x1,x2,x3,x4,x5,x6};
     return v;
