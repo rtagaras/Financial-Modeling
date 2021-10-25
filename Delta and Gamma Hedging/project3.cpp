@@ -7,7 +7,7 @@
 #include <Eigen/Dense>
 #include <math.h>
 #include <sqlite3.h>
-
+#include <string.h>
 
 using Eigen::MatrixXd;
 
@@ -47,7 +47,7 @@ class Database{
     sqlite3_stmt* stmt;
 
     // This can be called every time a query is executed. Right now, it just prints a row in the database to the console. 
-    static int callback(void *NotUsed, int argc, char **argv, char **azColName) {
+    static int Callback(void *NotUsed, int argc, char **argv, char **azColName) {
 
         // int argc: holds the number of results
         // (array) azColName: holds each column returned
@@ -64,12 +64,12 @@ class Database{
         return 0;
     }
 
-    void checkDBErrors(){
+    void CheckDBErrors(){
         
         if(rc){
             // Show an error message
             std::cout << "DB Error: " << sqlite3_errmsg(db) << std::endl;
-            closeDB(); 
+            CloseDB(); 
         }
     }
 
@@ -81,24 +81,29 @@ class Database{
         // Save the result of opening the file
         rc = sqlite3_open("database.db", &db);
 
-        checkDBErrors();
+        CheckDBErrors();
     }
 
-    void createTable(){
+    void CreateTable(){
 
         // Save SQL to create a table
         std::string sql = "CREATE TABLE IF NOT EXISTS Options(                         "              
-                          "    Underlying_symbol   TEXT   PRIMARY KEY   NOT NULL,      "
-                          "    Strike              REAL                 NOT NULL,      "
-                          "    Expiry_date         INT                  NOT NULL,      "
+                          "    Symbol              TEXT     NOT NULL,                  "
+                          "    Type                TEXT     NOT NULL,                  "
+                          "    Number_owned        REAL     NOT NULL,                  "
+                          "    Strike              REAL     NOT NULL,                  "
+                          "    Expiry_date         INT      NOT NULL,                  "
                           "    Value               REAL,                               "
                           "    Delta               REAL,                               "
-                          "    Gamma               REAL                                "
+                          "    Gamma               REAL,                               "
+                          "                                                            "
+                          "    PRIMARY KEY(Symbol, Strike, Expiry_date, Type)          "
                           ");                                                          "
                           "                                                            "
                           "CREATE TABLE IF NOT EXISTS Stocks(                          "
-                          "    Symbol   TEXT    PRIMARY KEY     NOT NULL,              "
-                          "    Value    REAL                                           "
+                          "    Symbol           TEXT    PRIMARY KEY     NOT NULL,      "
+                          "    Number_owned     REAL                    NOT NULL,      "
+                          "    Value            REAL                                   "
                           ");                                                          "
                           "                                                            ";
         
@@ -106,10 +111,11 @@ class Database{
         rc = sqlite3_exec(db, sql.c_str(), NULL, 0, &zErrMsg);
     }
 
-    void insertData(std::string sym, double value) {
+    // Insert a symbol and value pair into the chosen table
+    void InsertData(std::string table, std::string sym, double value) {
 
         // The query that we will execute
-        std::string query = "INSERT INTO Stocks ('Symbol', 'Value') VALUES ('" + sym + "','" + std::to_string(value) + "');";
+        std::string query = "INSERT INTO" + table + "('Symbol', 'Value') VALUES ('" + sym + "','" + std::to_string(value) + "');";
 
         // Prepare the query
         sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
@@ -121,18 +127,18 @@ class Database{
         sqlite3_finalize(stmt);    
     }
 
-    void showTable() {
+    void ShowTable(std::string table) {
 
-        std::string query = "SELECT * FROM 'Stocks';";
+        std::string query = "SELECT * FROM '" + table + "';";
 
         // Run the SQL
-        rc = sqlite3_exec(db, query.c_str(), callback, 0, &zErrMsg);
+        rc = sqlite3_exec(db, query.c_str(), Callback, 0, &zErrMsg);
 
     }
 
-    void deleteRow(std::string sym) {
+    void DeleteRow(std::string table, std::string sym) {
 
-        std::string query = "DELETE FROM 'Stocks' WHERE symbol = '" + sym + "';";
+        std::string query = "DELETE FROM '" + table + "' WHERE symbol = '" + sym + "';";
 
         // Prepare the query
         sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
@@ -144,7 +150,22 @@ class Database{
         sqlite3_finalize(stmt);
     }
 
-    void closeDB() {
+    // In the chosen table, change the specified parameter of security "sym" to val
+    void UpdateData(std::string table, std::string sym, std::string parameter, double val){
+
+        std::string query = "UPDATE " + table + "SET " + parameter + " = " + std::to_string(val) + "WHERE Symbol = '" + sym + "';";    
+        
+        // Prepare the query
+        sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+
+        // Run it
+        rc = sqlite3_step(stmt);
+
+        // Finialize the usage
+        sqlite3_finalize(stmt);
+    }
+
+    void CloseDB() {
 
         // Close the SQL connection
         sqlite3_close(db);
@@ -203,6 +224,9 @@ class Security : public RNG{
     double value;
 
     Security(std::string n, double initial_value): name(n), value(initial_value){}
+
+    virtual void buy(Database* D, int amount) = 0;
+    //virtual void sell() = 0;
 };
 
 class Stock : public Security{
@@ -225,6 +249,32 @@ class Stock : public Security{
         double z = gen_norm(0,1);
         return S_0*exp((mu-d)*t-0.5*sigma*sigma*t+sigma*z*sqrt(t));
     }
+
+    void buy(Database* D, int amount){
+
+        std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(amount) + ", NULL) "
+                            "ON CONFLICT(Symbol) DO UPDATE SET Number_owned = Number_owned+" + std::to_string(amount) + ";";
+
+        sqlite3* db;
+        sqlite3_stmt* stmt;
+        sqlite3_open("database.db", &db);
+        int rc = sqlite3_open("database.db", &db);
+
+        // CheckDBErrors();
+
+        // Prepare the query
+        sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+
+        // Run it
+        rc = sqlite3_step(stmt);
+
+        // Finialize the usage
+        sqlite3_finalize(stmt);
+    }
+
+    // void sell(Database* db){
+
+    // }
 };
 
 class Option : public Stock{
@@ -338,39 +388,39 @@ class Strategy{
     }
 };
 
-class Portfolio{
+// class Portfolio{
 
-    private:
-    double total_value = 0;
-    Database* db;
+//     private:
+//     double total_value = 0;
+//     Database* db;
 
-    public:
-    // Keys are invidivual securities, values are the amounts of each. 
+//     public:
+//     // Keys are invidivual securities, values are the amounts of each. 
     
-    Portfolio(Database* d, std::vector<Strategy<Option>> option_strategies, std::vector<Strategy<Stock>> stock_strategies) : db(d){
+//     Portfolio(Database* d, std::vector<Strategy<Option>> option_strategies, std::vector<Strategy<Stock>> stock_strategies) : db(d){
 
-        // Set up the initial portfolio as specified by the input asset list. 
+//         // Set up the initial portfolio as specified by the input asset list. 
         
-    }
+//     }
 
-    // Return the total value of the portfolio
-    double portfolio_value(){
-        total_value = 0;
+    // // Return the total value of the portfolio
+    // double portfolio_value(){
+    //     total_value = 0;
 
         
-    }
+    // }
 
-    // Add an amount of a given asset to the portfolio.
-    void Buy(Security* s, double amount){
+    // // Add an amount of a given asset to the portfolio.
+    // void Buy(Security* s, double amount){
         
-    }
+    // }
 
-    // Remove an amount of a given asset from the portfolio.
-    void Sell(Security* s, double amount){
+    // // Remove an amount of a given asset from the portfolio.
+    // void Sell(Security* s, double amount){
         
-    }
+    // }
 
-};
+// };
 
 class Simulator{
     // Here is where we actually evolve in time. At each time step, we will check the conditions on buying and selling, then execute as needed. 
@@ -382,12 +432,12 @@ class Simulator{
 int main(){
 
     double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01;
-    Option O1 = Option("ABC", S, K, r, d, T, sigma);
-    Option O2 = Option("DEF", S, K, r, d, T, sigma);
-
-    std::unordered_map<Option, int> m;
-    m[O1] = 1;
-    m[O2] = 2;
-
-
+    Stock S1 = Stock("SPY", S, r, sigma, d);
+    
+    Database D = Database();
+    Database* db = &D;
+    D.CreateTable();
+    
+    S1.buy(&D, 5);
+    D.ShowTable("Stocks");
 }
