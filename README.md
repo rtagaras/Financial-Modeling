@@ -7,3 +7,5 @@ Individual ideas are contained within their own folders; names are hopefully sel
 "Multiple Investment Risk" and "Options Pricing" follow "Finance with Monte Carlo" by Ronald Shonkwiler.
 
 "Black-Scholes Vanilla Options", "Vanilla Greeks", and "Delta and Gamma Hedging" follow "The Concepts and Practice of Mathematical Finance" by Mark Joshi.
+
+"Generating Sample Paths/Gaussian Short Rate" follows "Monte Carlo Methods in Financial Engineering" by Paul Glasserman. 
