@@ -132,8 +132,7 @@ class Database{
         std::string query = "SELECT * FROM '" + table + "';";
 
         // Run the SQL
-        rc = sqlite3_exec(db, query.c_str(), Callback, 0, &zErrMsg);
-
+        rc = sqlite3_exec(db, query.c_str(), Callback, 0, &zErrMsg);  
     }
 
     void DeleteRow(std::string table, std::string sym) {
@@ -163,6 +162,60 @@ class Database{
 
         // Finialize the usage
         sqlite3_finalize(stmt);
+    }
+
+    double GetValue(std::string table, std::string key, std::string parameter){
+        /*
+        This function takes a key and finds the corresponding parameter in the given table.
+
+        For now, this will only work for stocks, since the query includes "WHERE Symbol = x". Options will come later. I'm not exactly sure how I should 
+        specify the key yet. For a stock, a row in the table is uniqely identified by the stock's symbol, but for an option, we also need the expiry date
+        and strike price. I need a good way of incorporating all of this into one string, and then I need to figure out exactly how SQLite processes the
+        information to turn that into a primary key.  
+
+        Adapted from https://stackoverflow.com/questions/14437433/proper-use-of-callback-function-of-sqlite3-in-c
+        */
+
+       double value = 0;
+
+        try{
+            // sqlite3* d = DB.db;
+            // sqlite3_stmt *stmt;
+            
+            // Create an SQL statement in a form that SQLite can understand
+            int rc = sqlite3_prepare_v2(db, ("SELECT " + parameter + " FROM " + table + " WHERE Symbol = '" + key + '\'').c_str(), -1, &stmt, NULL);
+
+            if (rc != SQLITE_OK){
+                throw std::string(sqlite3_errmsg(db));
+            }
+
+            // Excecute the statement
+            rc = sqlite3_step(stmt);
+
+            if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+                std::string errmsg(sqlite3_errmsg(db));
+                sqlite3_finalize(stmt);
+                throw errmsg;
+            }
+
+            if (rc == SQLITE_DONE) {
+                sqlite3_finalize(stmt);
+                throw std::string("Stock not found");
+            }
+
+            // Finally, store the value
+            //this->value = sqlite3_column_double(stmt, 0);
+            value = sqlite3_column_double(stmt, 0);
+
+            // Behind-the-scenes stuff to prepare for another statement
+            sqlite3_finalize(stmt);
+        }
+
+        catch(const std::string& ex){
+            std::cout << ex << std::endl;
+        }
+
+        return value;
     }
 
     void CloseDB() {
@@ -225,8 +278,8 @@ class Security : public RNG{
 
     Security(std::string n, double initial_value): name(n), value(initial_value){}
 
-    virtual void buy(Database* D, int amount) = 0;
-    //virtual void sell() = 0;
+    virtual void Buy(Database D, int amount) = 0;
+    virtual void Sell(Database D, int amount) = 0;
 };
 
 class Stock : public Security{
@@ -250,11 +303,12 @@ class Stock : public Security{
         return S_0*exp((mu-d)*t-0.5*sigma*sigma*t+sigma*z*sqrt(t));
     }
 
-    void buy(Database* D, int amount){
+    void Buy(Database D, int amount){
 
+        // Try and insert a new row for the stock we are buying. If a row already exists, update the amount we own instead. 
         std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(amount) + ", NULL) "
                             "ON CONFLICT(Symbol) DO UPDATE SET Number_owned = Number_owned+" + std::to_string(amount) + ";";
-
+    
         sqlite3* db;
         sqlite3_stmt* stmt;
         sqlite3_open("database.db", &db);
@@ -270,11 +324,46 @@ class Stock : public Security{
 
         // Finialize the usage
         sqlite3_finalize(stmt);
+
+        // Now check to see if buying reduced our holdings to zero
+        double current_amount = D.GetValue("Stocks", name, "Number_owned");
+
+        // If so, erase the row from the database.
+        if(current_amount == 0){
+            D.DeleteRow("Stocks", name);
+        } 
     }
 
-    // void sell(Database* db){
+    void Sell(Database D, int amount){
 
-    // }
+        // Try and insert a new row for the stock we are buying. If a row already exists, update the amount we own instead. 
+        std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(-amount) + ", NULL) "
+                            "ON CONFLICT(Symbol) DO UPDATE SET Number_owned = Number_owned-" + std::to_string(amount) + ";";
+    
+        sqlite3* db;
+        sqlite3_stmt* stmt;
+        sqlite3_open("database.db", &db);
+        int rc = sqlite3_open("database.db", &db);
+
+        // CheckDBErrors();
+
+        // Prepare the query
+        sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+
+        // Run it
+        rc = sqlite3_step(stmt);
+
+        // Finialize the usage
+        sqlite3_finalize(stmt);
+
+        // Now check to see if buying reduced our holdings to zero
+        double current_amount = D.GetValue("Stocks", name, "Number_owned");
+
+        // If so, erase the row from the database.
+        if(current_amount == 0){
+            D.DeleteRow("Stocks", name);
+        } 
+    }
 };
 
 class Option : public Stock{
@@ -435,9 +524,13 @@ int main(){
     Stock S1 = Stock("SPY", S, r, sigma, d);
     
     Database D = Database();
-    Database* db = &D;
     D.CreateTable();
     
-    S1.buy(&D, 5);
-    D.ShowTable("Stocks");
+    S1.Buy(D, 5);
+
+    // Something about the ShowTable command stops the program from running any lines that occur after it. WHY??
+    //D.ShowTable("Stocks");
+
+    // We can also use the get_value function to print the number of stocks owned, as well as to get other parameters if we need them
+    std::cout << "Amount of SPY owned: " << D.GetValue("Stocks", "SPY", "Number_owned") << std::endl;
 }
