@@ -70,6 +70,12 @@ double Stock::SDE_price(double t){
 }
 
 void Stock::Buy(Database D, int amount){
+    /*
+    This function is used to buy or sell a stock. "D" specifies the database that we want to update when conducting the transaction and "amount" is the
+    amount we want to buy or sell (positive for buying, negative for selling).
+
+    Closing positions is automatically handled. 
+    */
 
     // Try and insert a new row for the stock we are buying. If a row already exists, update the amount we own instead. 
     std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(amount) + ", NULL) "
@@ -92,38 +98,7 @@ void Stock::Buy(Database D, int amount){
     sqlite3_finalize(stmt);
 
     // Now check to see if buying reduced our holdings to zero
-    double current_amount = D.GetValue("Stocks", name, "Number_owned");
-
-    // If so, erase the row from the database.
-    if(current_amount == 0){
-        D.DeleteRow("Stocks", name);
-    } 
-}
-
-void Stock::Sell(Database D, int amount){
-
-    // Try and insert a new row for the stock we are buying. If a row already exists, update the amount we own instead. 
-    std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(-amount) + ", NULL) "
-                        "ON CONFLICT(Symbol) DO UPDATE SET Number_owned = Number_owned-" + std::to_string(amount) + ";";
-
-    sqlite3* db;
-    sqlite3_stmt* stmt;
-    sqlite3_open("holdings.db", &db);
-    int rc = sqlite3_open("holdings.db", &db);
-
-    D.CheckDBErrors();
-
-    // Prepare the query
-    sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
-
-    // Run it
-    rc = sqlite3_step(stmt);
-
-    // Finialize the usage
-    sqlite3_finalize(stmt);
-
-    // Now check to see if buying reduced our holdings to zero
-    double current_amount = D.GetValue("Stocks", name, "Number_owned");
+    double current_amount = D.GetStockParameter(name, "Number_owned");
 
     // If so, erase the row from the database.
     if(current_amount == 0){
@@ -141,8 +116,9 @@ Class for a generic option. Specific option types will inherit from this.
 K is the strike, and T is the time until expiry.
 */
 
-Option::Option(std::string underlying_name, double S_0, double K_, double mu_0, double sigma_0, double d_0, double T_) 
-: K(K_), T(T_), Stock(underlying_name, S_0, mu_0, sigma_0, d_0){}
+Option::Option(std::string underlying_name, double S_0, double K_, double mu_0, double sigma_0, double d_0, double exp) : K(K_), Expiry_time(exp), Stock(underlying_name, S_0, mu_0, sigma_0, d_0){
+    T = Expiry_time - t;
+}
 
 double Option::payout(double x){
     /*
@@ -195,4 +171,41 @@ double Call::BS_Delta(double S){
 
 double Call::BS_Gamma(double S){
     return exp(-d*T)*N_prime(d1(S))/(S*sigma*sqrt(T));
+}
+
+void Call::Buy(Database D, int amount){
+    /*
+    This function is used to buy or sell an option. "D" specifies the database that we want to update when conducting the transaction and "amount" is the
+    amount we want to buy or sell (positive for buying, negative for selling).
+
+    Closing positions is automatically handled. 
+    */
+
+    // Try and insert a new row for the option we are buying. If a row already exists, update the amount we own instead. 
+    std::string query = "INSERT INTO Options VALUES  ('" + name + "', 'CALL', " + std::to_string(amount) + ", " + std::to_string(K) + ", " + std::to_string(Expiry_time) + ", NULL, NULL, NULL)"
+                        "ON CONFLICT(Symbol, Strike, Expiry_date, Type) DO UPDATE SET Number_owned = Number_owned+" + std::to_string(amount) + ";";
+
+    sqlite3* db;
+    sqlite3_stmt* stmt;
+    sqlite3_open("holdings.db", &db);
+    int rc = sqlite3_open("holdings.db", &db);
+
+    D.CheckDBErrors();
+
+    // Prepare the query
+    sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+
+    // Run it
+    rc = sqlite3_step(stmt);
+
+    // Finialize the usage
+    sqlite3_finalize(stmt);
+
+    // Now check to see if buying reduced our holdings to zero
+    double current_amount = D.GetOptionParameter(name, K, Expiry_time, "CALL", "Number_owned");
+
+    // If so, erase the row from the database.
+    if(current_amount == 0){
+        D.DeleteRow("Stocks", name);
+    } 
 }

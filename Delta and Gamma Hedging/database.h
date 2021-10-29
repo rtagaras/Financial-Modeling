@@ -31,8 +31,8 @@ class Database{
 
     void CreateTable();
 
-    // Insert a symbol and value pair into the chosen table
-    void InsertData(std::string table, std::string sym, double value);
+    // // Insert a symbol and value pair into the chosen table
+    // void InsertData(std::string table, std::string sym, double value);
 
     // Print table to console
     void ShowTable(std::string table);
@@ -43,8 +43,11 @@ class Database{
     // In the chosen table, change the specified parameter of security "sym" to val
     void UpdateData(std::string table, std::string sym, std::string parameter, double val);
 
-    // Given a table and a primary key, return the value in the "parameter" column
-    double GetValue(std::string table, std::string key, std::string parameter);
+    // Given a symbol for a stock, return the value in the "parameter" column
+    double GetStockParameter(std::string key, std::string parameter);
+
+    // Given a symbol, strike, expiry date, and type for an option, return the value in the "parameter" column
+    double GetOptionParameter(std::string symbol, double strike, double expiry_date, std::string type, std::string parameter);
 
     void CloseDB(); 
 };

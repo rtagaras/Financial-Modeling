@@ -86,17 +86,12 @@ class Simulator{
 
 int main(){
 
-    double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01;
-    Stock S1 = Stock("SPY", S, r, sigma, d);
-    
+    double S = 100, K = 90, r = 0.03, d = 0.01, T = 60/365., sigma = 0.3, epsilon=0.01, Expiry_time=0;
+    Call C = Call("SPY", S, K, r, sigma, d, Expiry_time);
     Database D = Database();
     D.CreateTable();
-    
-    S1.Buy(D, 5);
+    C.Buy(D, 5);
 
-    // Something about the ShowTable command stops the program from running any lines that occur after it. WHY??
-    //D.ShowTable("Stocks");
-
-    // We can also use the get_value function to print the number of stocks owned, as well as to get other parameters if we need them
-    std::cout << "Amount of SPY owned: " << D.GetValue("Stocks", "SPY", "Number_owned") << std::endl;
+    // We can use the get_value function to print the number of stocks owned, as well as to get other parameters if we need them
+    std::cout << "Amount of SPY Call owned: " << D.GetOptionParameter("SPY", K, Expiry_time, "CALL", "Number_owned") << std::endl;
 }
