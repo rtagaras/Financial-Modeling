@@ -60,24 +60,24 @@ void Database::CreateTable(){
 
     // SQL to create the tables
     std::string sql = "CREATE TABLE IF NOT EXISTS Options(                         "              
-                        "    Symbol              TEXT     NOT NULL,                  "
-                        "    Type                TEXT     NOT NULL,                  "
-                        "    Number_owned        REAL     NOT NULL,                  "
-                        "    Strike              REAL     NOT NULL,                  "
-                        "    Expiry_date         INT      NOT NULL,                  "
-                        "    Value               REAL,                               "
-                        "    Total_value         REAL,                               "
-                        "                                                            "
-                        "    PRIMARY KEY(Symbol, Strike, Expiry_date, Type)          "
-                        ");                                                          "
-                        "                                                            "
-                        "CREATE TABLE IF NOT EXISTS Stocks(                          "
-                        "    Symbol           TEXT    PRIMARY KEY     NOT NULL,      "
-                        "    Number_owned     REAL                    NOT NULL,      "
-                        "    Value            REAL,                                  "
-                        "    Total_value      REAL                                   "
-                        ");                                                          "
-                        "                                                            ";
+                      "    Symbol              TEXT     NOT NULL,                  "
+                      "    Type                TEXT     NOT NULL,                  "
+                      "    Number_owned        REAL     NOT NULL,                  "
+                      "    Strike              REAL     NOT NULL,                  "
+                      "    Expiry_date         INT      NOT NULL,                  "
+                      "    Value               REAL,                               "
+                      "    Total_value         REAL,                               "
+                      "                                                            "
+                      "    PRIMARY KEY(Symbol, Strike, Expiry_date, Type)          "
+                      ");                                                          "
+                      "                                                            "
+                      "CREATE TABLE IF NOT EXISTS Stocks(                          "
+                      "    Symbol           TEXT    PRIMARY KEY     NOT NULL,      "
+                      "    Number_owned     REAL                    NOT NULL,      "
+                      "    Value            REAL,                                  "
+                      "    Total_value      REAL                                   "
+                      ");                                                          "
+                      "                                                            ";
     
     // Run the SQL
     rc = sqlite3_exec(db, sql.c_str(), NULL, 0, &zErrMsg);
@@ -121,14 +121,15 @@ void Database::DeleteRow(std::string table, std::string sym, std::optional<doubl
         return;
     }
 
-    // Prepare the query
-    sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+    // // Prepare the query
+    // sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
 
-    // Run it
-    rc = sqlite3_step(stmt);
+    // // Run it
+    // rc = sqlite3_step(stmt);
 
-    // Finialize the usage
-    sqlite3_finalize(stmt);
+    // // Finialize the usage
+    // sqlite3_finalize(stmt);
+    rc = sqlite3_exec(db, query.c_str(), NULL, 0, &zErrMsg);
 }
 
 void Database::UpdateData(std::string table, std::string parameter, double val, std::string sym, std::optional<double> strike, std::optional<double> expiry_date, std::optional<std::string> type){
@@ -156,14 +157,15 @@ void Database::UpdateData(std::string table, std::string parameter, double val, 
         return;
     }
 
-    // Prepare the query
-    sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
+    // // Prepare the query
+    // sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
 
-    // Run it
-    rc = sqlite3_step(stmt);
+    // // Run it
+    // rc = sqlite3_step(stmt);
 
-    // Finialize the usage
-    sqlite3_finalize(stmt);
+    // // Finialize the usage
+    // sqlite3_finalize(stmt);
+    rc = sqlite3_exec(db, query.c_str(), NULL, 0, &zErrMsg);
 }
 
 double Database::GetStockParameter(std::string key, std::string parameter){
