@@ -1,9 +1,13 @@
 #include "securities.h"
+#include <optional>
 
 //======================================================================================================================================================
 //  Implementation of RNG class
 //======================================================================================================================================================
 
+/*
+Class that holds all random number generation functions. Anything that needs RNG will inherit from this. 
+*/
 RNG::RNG() : gen((std::random_device())()) {}
 
 double RNG::gen_norm(double mean, double variance){
@@ -78,7 +82,7 @@ void Stock::Buy(Database D, int amount){
     */
 
     // Try and insert a new row for the stock we are buying. If a row already exists, update the amount we own instead. 
-    std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(amount) + ", NULL) "
+    std::string query = "INSERT INTO Stocks VALUES('" + name + "'," + std::to_string(amount) + ", NULL, NULL) "
                         "ON CONFLICT(Symbol) DO UPDATE SET Number_owned = Number_owned+" + std::to_string(amount) + ";";
 
     sqlite3* db;
@@ -97,13 +101,17 @@ void Stock::Buy(Database D, int amount){
     // Finialize the usage
     sqlite3_finalize(stmt);
 
-    // Now check to see if buying reduced our holdings to zero
+    // Check how much we own after buying/selling. This is needed to update the total value of the security and to see if buying/selling reduced our 
+    //holdings to zero.
     double current_amount = D.GetStockParameter(name, "Number_owned");
 
-    // If so, erase the row from the database.
+    // Update the total value of whatever we just bought
+    D.UpdateData("Stocks", "Total_value", value*current_amount, name);
+
+    // If we don't own anything, erase the row from the database.
     if(current_amount == 0){
-        D.DeleteRow("Stocks", name);
-    } 
+        D.DeleteRow("Stocks", name, std::nullopt, std::nullopt, std::nullopt);
+    }
 }
 
 //======================================================================================================================================================
@@ -182,7 +190,7 @@ void Call::Buy(Database D, int amount){
     */
 
     // Try and insert a new row for the option we are buying. If a row already exists, update the amount we own instead. 
-    std::string query = "INSERT INTO Options VALUES  ('" + name + "', 'CALL', " + std::to_string(amount) + ", " + std::to_string(K) + ", " + std::to_string(Expiry_time) + ", NULL, NULL, NULL)"
+    std::string query = "INSERT INTO Options VALUES  ('" + name + "', 'CALL', " + std::to_string(amount) + ", " + std::to_string(K) + ", " + std::to_string(Expiry_time) + ", NULL, NULL)"
                         "ON CONFLICT(Symbol, Strike, Expiry_date, Type) DO UPDATE SET Number_owned = Number_owned+" + std::to_string(amount) + ";";
 
     sqlite3* db;
@@ -201,11 +209,15 @@ void Call::Buy(Database D, int amount){
     // Finialize the usage
     sqlite3_finalize(stmt);
 
-    // Now check to see if buying reduced our holdings to zero
+    // Check how much we own after buying/selling. This is needed to update the total value of the security and to see if buying/selling reduced our 
+    //holdings to zero.
     double current_amount = D.GetOptionParameter(name, K, Expiry_time, "CALL", "Number_owned");
 
-    // If so, erase the row from the database.
+    // Update the total value of whatever we just bought
+    D.UpdateData("Options", "Total_value", value*current_amount, name, K, Expiry_time, "CALL");
+
+    // If we don't own anything, erase the row from the database.
     if(current_amount == 0){
-        D.DeleteRow("Stocks", name);
-    } 
+        D.DeleteRow("Options", name, K, Expiry_time, "CALL");
+    }
 }

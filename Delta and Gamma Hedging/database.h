@@ -1,5 +1,7 @@
-#include<string>
-#include<sqlite3.h>
+#include <string>
+#include <sqlite3.h>
+#include <vector>
+#include <optional>
 
 class Database{
     /*
@@ -38,16 +40,22 @@ class Database{
     void ShowTable(std::string table);
 
     // Delete the row corresponding to sym
-    void DeleteRow(std::string table, std::string sym);
+    void DeleteRow(std::string table, std::string sym, std::optional<double> strike, std::optional<double> expiry_date, std::optional<std::string> type);
 
     // In the chosen table, change the specified parameter of security "sym" to val
-    void UpdateData(std::string table, std::string sym, std::string parameter, double val);
+    void UpdateData(std::string table, std::string parameter, double val, std::string sym, std::optional<double> strike=std::nullopt, std::optional<double> expiry_date=std::nullopt, std::optional<std::string> type=std::nullopt);
 
     // Given a symbol for a stock, return the value in the "parameter" column
     double GetStockParameter(std::string key, std::string parameter);
 
     // Given a symbol, strike, expiry date, and type for an option, return the value in the "parameter" column
     double GetOptionParameter(std::string symbol, double strike, double expiry_date, std::string type, std::string parameter);
+
+    // Return the names of each table in the database
+    std::vector<std::string> GetTableNames();
+
+    // Return the total value of all the securities in the database
+    double GetTotalValue();
 
     void CloseDB(); 
 };

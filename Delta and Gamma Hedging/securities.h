@@ -1,6 +1,7 @@
 #include <random>
 #include <vector>
 #include "database.h"
+#include <optional>
 
 class RNG{
 

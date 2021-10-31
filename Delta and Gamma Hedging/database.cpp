@@ -1,5 +1,7 @@
 #include "database.h"
 #include <iostream>
+#include <vector>
+#include <optional>
 
 /*
 Class for the SQLite database that stores any persistent data used by the system. Currently, it contains tables for stock and option prices and 
@@ -64,8 +66,7 @@ void Database::CreateTable(){
                         "    Strike              REAL     NOT NULL,                  "
                         "    Expiry_date         INT      NOT NULL,                  "
                         "    Value               REAL,                               "
-                        "    Delta               REAL,                               "
-                        "    Gamma               REAL,                               "
+                        "    Total_value         REAL,                               "
                         "                                                            "
                         "    PRIMARY KEY(Symbol, Strike, Expiry_date, Type)          "
                         ");                                                          "
@@ -73,31 +74,14 @@ void Database::CreateTable(){
                         "CREATE TABLE IF NOT EXISTS Stocks(                          "
                         "    Symbol           TEXT    PRIMARY KEY     NOT NULL,      "
                         "    Number_owned     REAL                    NOT NULL,      "
-                        "    Value            REAL                                   "
+                        "    Value            REAL,                                  "
+                        "    Total_value      REAL                                   "
                         ");                                                          "
                         "                                                            ";
     
     // Run the SQL
     rc = sqlite3_exec(db, sql.c_str(), NULL, 0, &zErrMsg);
 }
-
-// void Database::InsertData(std::string table, std::string sym, double value){
-//     /*
-//     Insert a symbol and value pair into the chosen table
-//     */
-
-//     // The query that we will execute
-//     std::string query = "INSERT INTO" + table + "('Symbol', 'Value') VALUES ('" + sym + "','" + std::to_string(value) + "');";
-
-//     // Prepare the query
-//     sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
-
-//     // Execute it
-//     rc = sqlite3_step(stmt);
-
-//     // Finialize the usage
-//     sqlite3_finalize(stmt);    
-// }
 
 void Database::ShowTable(std::string table){
     /*
@@ -112,14 +96,30 @@ void Database::ShowTable(std::string table){
     rc = sqlite3_exec(db, query.c_str(), Callback, 0, &zErrMsg);  
 }
 
-void Database::DeleteRow(std::string table, std::string sym) {
+void Database::DeleteRow(std::string table, std::string sym, std::optional<double> strike=std::nullopt, std::optional<double> expiry_date=std::nullopt, std::optional<std::string> type=std::nullopt) {
     /*
     Delete a row from the chosen table.
-
-    TODO: Extend this to handle options. The symbol isn't enough to specify an option, so this won't work right. 
     */
+    
+    std::string query;
 
-    std::string query = "DELETE FROM '" + table + "' WHERE symbol = '" + sym + "';";
+    if(table == "Stocks"){
+        query = "DELETE FROM '" + table + "' WHERE symbol = '" + sym + "';";
+    }
+
+    else if(table == "Options" && strike && expiry_date && type){
+        query = "DELETE FROM '" + table + "' WHERE symbol = '" + sym + "' AND Strike=" + std::to_string(strike.value()) + " AND Expiry_date=" + std::to_string(expiry_date.value()) + " AND Type='" + type.value() + "';";
+    }
+
+    else if(table == "Options" && !(strike && expiry_date && type)){
+        std::cout << "Missing option parameter" << std::endl;
+        return;
+    }
+
+    else{
+        std::cout << "Unknown row specified for deletion" << std::endl;
+        return;
+    }
 
     // Prepare the query
     sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
@@ -131,15 +131,31 @@ void Database::DeleteRow(std::string table, std::string sym) {
     sqlite3_finalize(stmt);
 }
 
-void Database::UpdateData(std::string table, std::string sym, std::string parameter, double val){
+void Database::UpdateData(std::string table, std::string parameter, double val, std::string sym, std::optional<double> strike, std::optional<double> expiry_date, std::optional<std::string> type){
     /*
     In the chosen table, change the specified parameter of security "sym" to val.
-
-    TODO: Like DeleteRow, this needs to be updated to handle options. 
     */
 
-    std::string query = "UPDATE " + table + "SET " + parameter + " = " + std::to_string(val) + "WHERE Symbol = '" + sym + "';";    
-    
+    std::string query;
+
+    if(table == "Stocks"){
+        query = "UPDATE " + table + " SET " + parameter + " = " + std::to_string(val) + " WHERE Symbol = '" + sym + "';";    
+    }
+
+    else if(table == "Options" && strike && expiry_date && type){
+        query = "UPDATE " + table + " SET " + parameter + " = " + std::to_string(val) + " WHERE Symbol = '" + sym + "' AND strike=" + std::to_string(strike.value()) + " AND expiry_date=" + std::to_string(expiry_date.value()) + " AND type='" + type.value() + "';";    
+    }
+
+    else if(table == "Options" && !(strike && expiry_date && type)){
+        std::cout << "Missing option parameter" << std::endl;
+        return;
+    }
+
+    else{
+        std::cout << "Unknown parameter specified for update" << std::endl;
+        return;
+    }
+
     // Prepare the query
     sqlite3_prepare(db, query.c_str(), query.length(), &stmt, NULL);
 
@@ -255,9 +271,98 @@ double Database::GetOptionParameter(std::string symbol, double strike, double ex
     return value;
 }
 
+std::vector<std::string> Database::GetTableNames(){
+    /*
+    Return the total value of the portfolio.
+
+    Adapted from https://stackoverflow.com/questions/14437433/proper-use-of-callback-function-of-sqlite3-in-c
+    */
+
+    std::vector<std::string> names;
+
+    try{
+        // Get every table in the database
+        std::string query = "SELECT name FROM sqlite_master WHERE type='table';";
+
+        // Create an SQL statement in a form that SQLite can understand
+        int rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL);
+
+        if (rc != SQLITE_OK){
+            throw std::string(sqlite3_errmsg(db));
+        }
+
+        // Excecute the statement
+        rc = sqlite3_step(stmt);
+
+        // Check for errors
+        if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+            std::string errmsg(sqlite3_errmsg(db));
+            sqlite3_finalize(stmt);
+            throw errmsg;
+        }
+
+        // Go through the rows and put the table names into the vector
+        while(rc == SQLITE_ROW){
+            
+            // https://stackoverflow.com/questions/804123/const-unsigned-char-to-stdstring
+            names.push_back(std::string(reinterpret_cast<const char*>(sqlite3_column_text(stmt, 0))));
+            rc = sqlite3_step(stmt);
+        }
+
+        // Behind-the-scenes stuff to prepare for another statement
+        sqlite3_finalize(stmt);
+    }
+
+    catch(const std::string& ex){
+        std::cout << ex << std::endl;
+    }
+
+    return names;
+}
+
+double Database::GetTotalValue(){
+    std::vector<std::string> tables = GetTableNames();
+    double total = 0;
+
+    for(std::string x : tables){
+         try{
+
+            // Get the sum of the total_value column from each table
+            std::string query = "SELECT SUM(Total_value) FROM " + x + ";";
+
+            // Create an SQL statement in a form that SQLite can understand
+            int rc = sqlite3_prepare_v2(db, query.c_str(), -1, &stmt, NULL);
+
+            if (rc != SQLITE_OK){
+                throw std::string(sqlite3_errmsg(db));
+            }
+
+            // Excecute the statement
+            rc = sqlite3_step(stmt);
+
+            // Check for errors
+            if (rc != SQLITE_ROW && rc != SQLITE_DONE) {
+                std::string errmsg(sqlite3_errmsg(db));
+                sqlite3_finalize(stmt);
+                throw errmsg;
+            }
+
+            total += sqlite3_column_double(stmt, 0);
+
+            // Behind-the-scenes stuff to prepare for another statement
+            sqlite3_finalize(stmt);
+        }
+
+        catch(const std::string& ex){
+            std::cout << ex << std::endl;
+        }
+    }
+
+    return total;
+}
+
 void Database::CloseDB() {
 
     // Close the SQL connection
     sqlite3_close(db);
 }
-
